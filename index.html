@@ -1,1678 +1,832 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>心智圖記事本</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>心智圖</title>
 <style>
-:root{
-  --paper:#f6f2e8;
-  --paper-deep:#eee7d6;
-  --card:#fdfaf2;
-  --ink:#37332b;
-  --ink-soft:#7a7160;
-  --ink-faint:#a89d88;
-  --line:#ddd3bf;
-  --line-soft:#e9e2d1;
-  --accent:#b5495b;
-  --accent-deep:#963c4c;
-  --accent-wash:#f6e7e7;
-  --ok:#6f7d5c;
-  --shadow:0 2px 16px rgba(70,58,34,.12);
-  --serif:"Noto Serif TC","Source Han Serif TC","Hiragino Mincho ProN","Yu Mincho","PMingLiU",serif;
-  --mono:"SFMono-Regular",Consolas,"Courier New",monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
-  font-family:var(--serif);
-  background:var(--paper);
-  color:var(--ink);
-  display:flex;flex-direction:column;
-  overflow:hidden;
-  font-size:15px;
-}
-button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
-button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-input,textarea{font-family:inherit;color:inherit}
-::selection{background:var(--accent-wash)}
+    :root{
+        --bg:#F5F6F7;
+        --panel:#FFFFFF;
+        --line:#E3E6EA;
+        --ink:#2B3440;
+        --ink-2:#6B7684;
+        --accent:#3D8AF7;
+        --accent-soft:#EAF2FE;
+        --warn:#E8833A;
+        --danger:#D9534F;
+        --shadow:0 6px 24px rgba(30,40,60,.12);
+        font-size:14px;
+    }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html,body{ height:100%; overflow:hidden; }
+    body{
+        font-family:"Segoe UI","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+        background:var(--bg); color:var(--ink);
+        display:flex; flex-direction:column;
+    }
+    .hidden{ display:none !important; }
 
-/* ---------- 頂列 ---------- */
-#topbar{
-  display:flex;align-items:center;gap:10px;
-  height:52px;padding:0 14px;
-  border-bottom:1px solid var(--line);
-  background:var(--paper);
-  flex:0 0 auto;z-index:30;
-}
-.iconbtn{
-  width:34px;height:34px;border-radius:8px;
-  display:inline-flex;align-items:center;justify-content:center;
-  color:var(--ink-soft);
-}
-.iconbtn:hover{background:var(--paper-deep);color:var(--ink)}
-.iconbtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.brand{display:flex;align-items:center;gap:9px;user-select:none}
-.brand-seal{
-  width:26px;height:26px;border-radius:5px;
-  background:var(--accent);color:#fdf9f0;
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:14px;letter-spacing:0;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
-}
-.brand-name{font-size:15px;letter-spacing:.14em;color:var(--ink)}
-.map-title{
-  margin-left:6px;padding:4px 10px;border-radius:7px;
-  font-size:14px;color:var(--ink-soft);cursor:pointer;
-  max-width:34vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  border:1px solid transparent;
-}
-.map-title:hover{border-color:var(--line);color:var(--ink)}
-.map-title.none{cursor:default;font-style:italic;color:var(--ink-faint)}
-.map-title.none:hover{border-color:transparent}
-.spacer{flex:1}
-.save-status{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);letter-spacing:.05em}
-.save-status .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);transition:background .3s}
-.save-status.dirty .dot{background:#c9a24b}
-.save-status.saving .dot{background:#c9a24b;animation:pulse 1s infinite}
-.save-status.saved .dot{background:var(--ok)}
-.save-status.error .dot{background:var(--accent)}
-@keyframes pulse{50%{opacity:.35}}
-.btn{
-  padding:6px 16px;border-radius:8px;font-size:13.5px;letter-spacing:.1em;
-  border:1px solid var(--line);color:var(--ink);
-}
-.btn:hover{background:var(--paper-deep)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fdf9f0}
-.btn.primary:hover{background:var(--accent-deep)}
-.btn.danger{color:var(--accent);border-color:var(--accent)}
-.btn.danger:hover{background:var(--accent-wash)}
-.btn:disabled{opacity:.45;cursor:default}
+    /* ============ 頂部工具列 ============ */
+    #toolbar{
+        height:48px; flex:0 0 48px;
+        background:var(--panel); border-bottom:1px solid var(--line);
+        display:flex; align-items:center; gap:6px; padding:0 10px;
+        overflow-x:auto; overflow-y:hidden;
+        position:relative; z-index:30; user-select:none;
+    }
+    #toolbar > *{ flex:0 0 auto; }
+    .brand{ display:flex; align-items:center; gap:8px; margin-right:4px; font-weight:700; letter-spacing:.05em; white-space:nowrap; }
+    .brand .dot{ width:10px; height:10px; border-radius:3px; background:var(--accent);
+                 box-shadow:3px 3px 0 0 #EE8435, -3px 3px 0 0 #22A198; }
+    .tb-sep{ width:1px; height:22px; background:var(--line); margin:0 4px; }
+    .tb-btn{
+        border:0; background:transparent; color:var(--ink);
+        height:32px; padding:0 10px; border-radius:7px; cursor:pointer;
+        font:inherit; font-size:13px; display:inline-flex; align-items:center; gap:4px;
+        white-space:nowrap;
+    }
+    .tb-btn:hover{ background:#EEF1F5; }
+    .tb-btn:disabled{ opacity:.35; cursor:default; }
+    .tb-btn:disabled:hover{ background:transparent; }
+    .tb-btn.primary{ background:var(--accent); color:#fff; font-weight:600; }
+    .tb-btn.primary:hover{ background:#2F79E6; }
+    .tb-btn.icon{ width:32px; padding:0; justify-content:center; font-size:15px; }
+    #mapTitle{
+        border:1px solid transparent; border-radius:7px; background:transparent;
+        font:inherit; font-size:14px; font-weight:600; color:var(--ink);
+        height:32px; padding:0 8px; flex:0 1 200px; min-width:90px;
+    }
+    #mapTitle:hover{ background:#F2F4F7; }
+    #mapTitle:focus{ outline:none; border-color:var(--accent); background:#fff; }
+    #saveState{ font-size:12px; color:var(--ink-2); min-width:86px; }
+    #saveState.dirty{ color:var(--warn); font-weight:600; }
+    #zoomLabel{ min-width:46px; text-align:center; font-variant-numeric:tabular-nums; }
+    .tb-flex{ flex:1; }
+    .tb-check{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-2); cursor:pointer; }
+    .tb-check input{ accent-color:var(--accent); }
 
-/* ---------- 主區 ---------- */
-#main{flex:1;display:flex;position:relative;overflow:hidden}
-#canvasWrap{flex:1;position:relative;overflow:hidden;background:
-  radial-gradient(1200px 700px at 30% 0%, rgba(255,255,255,.5), transparent 70%),
-  var(--paper);}
-#canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
-#canvas .edge{fill:none;stroke:var(--ink-faint);stroke-width:1.3;opacity:.85}
-#canvas .node{cursor:pointer}
-#canvas .node .box{fill:var(--card);stroke:var(--line);stroke-width:1.1;
-  filter:drop-shadow(0 1px 2px rgba(70,58,34,.10))}
-#canvas .node text{font-family:var(--serif);fill:var(--ink);user-select:none;pointer-events:none}
-#canvas .node.root .box{fill:var(--ink);stroke:none}
-#canvas .node.root text{fill:var(--paper)}
-#canvas .node.sel .box{stroke:var(--accent);stroke-width:1.8}
-#canvas .node.sel.root .box{stroke:var(--accent);stroke-width:1.8}
-#canvas .colorbar{pointer-events:none}
-#canvas .toggle circle{fill:var(--paper);stroke:var(--line);stroke-width:1.1}
-#canvas .toggle:hover circle{stroke:var(--accent)}
-#canvas .toggle text{font-size:10px;fill:var(--ink-soft);pointer-events:none}
-#canvas .noteflag path{stroke:var(--accent);stroke-width:1.3;fill:none;stroke-linecap:round}
-#canvas .noteflag rect{fill:transparent}
-#canvas .noteflag:hover path{stroke:var(--accent-deep)}
+    /* ============ 畫布區 ============ */
+    #stage{ position:relative; flex:1; overflow:hidden; background:var(--bg); }
+    #svg{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; user-select:none; -webkit-user-select:none; }
+    #svg:active{ cursor:grabbing; }
+    .mm-node{ cursor:pointer; }
+    .mm-node text{ user-select:none; pointer-events:none; }
+    .mm-toggle{ opacity:0; transition:opacity .12s; }
+    .mm-node:hover .mm-toggle, .mm-toggle.on{ opacity:1; }
 
-.empty-hint{
-  position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;
-  align-items:center;justify-content:center;text-align:center;
-  color:var(--ink-faint);letter-spacing:.12em;font-size:14px;
-  pointer-events:none;padding:0 24px;line-height:2;
-}
-.empty-hint[hidden]{display:none}
+    /* 節點文字編輯框（覆蓋在節點上） */
+    #editor{
+        position:absolute; z-index:20; resize:none; overflow:hidden;
+        border:2px solid var(--accent); border-radius:7px;
+        background:#fff; color:var(--ink); box-shadow:var(--shadow);
+        font-family:inherit; text-align:center; line-height:1.4;
+    }
+    #editor:focus{ outline:none; }
 
-/* 浮動工具列 */
-#toolbar{
-  position:absolute;left:14px;top:14px;z-index:10;
-  display:flex;flex-direction:column;gap:2px;
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
-  padding:6px 5px;box-shadow:var(--shadow);
-}
-#toolbar .tbtn{
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  width:52px;padding:7px 0 5px;border-radius:8px;color:var(--ink-soft);
-}
-#toolbar .tbtn:hover{background:var(--paper-deep);color:var(--ink)}
-#toolbar .tbtn:disabled{opacity:.32;cursor:default}
-#toolbar .tbtn:disabled:hover{background:none;color:var(--ink-soft)}
-#toolbar .tbtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
-#toolbar .tbtn span{font-size:10.5px;letter-spacing:.08em}
-#toolbar .sep{height:1px;background:var(--line-soft);margin:4px 6px}
+    /* 拖曳殘影 */
+    #dragGhost{
+        position:fixed; z-index:60; pointer-events:none;
+        background:rgba(61,138,247,.14); border:1.5px dashed var(--accent);
+        color:var(--ink); border-radius:7px; padding:4px 12px;
+        font-size:13px; max-width:240px; overflow:hidden;
+        text-overflow:ellipsis; white-space:nowrap;
+    }
 
-/* 縮放列 */
-#zoomBar{
-  position:absolute;right:14px;bottom:14px;z-index:10;
-  display:flex;align-items:center;gap:2px;
-  background:var(--card);border:1px solid var(--line);border-radius:9px;
-  padding:3px 4px;box-shadow:var(--shadow);
-}
-#zoomBar button{width:28px;height:28px;border-radius:6px;color:var(--ink-soft);
-  display:inline-flex;align-items:center;justify-content:center;font-size:16px}
-#zoomBar button:hover{background:var(--paper-deep);color:var(--ink)}
-#zoomBar svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round}
-#zoomPct{min-width:46px;text-align:center;font-size:12px;color:var(--ink-soft);cursor:pointer;letter-spacing:.02em}
+    /* ============ 右鍵選單 ============ */
+    #ctxMenu{
+        position:fixed; z-index:70; min-width:190px;
+        background:var(--panel); border:1px solid var(--line); border-radius:10px;
+        box-shadow:var(--shadow); padding:5px; user-select:none;
+    }
+    .ctx-item{
+        display:flex; align-items:center; justify-content:space-between; gap:16px;
+        padding:7px 10px; border-radius:7px; font-size:13px; cursor:pointer;
+    }
+    .ctx-item:hover{ background:var(--accent-soft); }
+    .ctx-item.danger:hover{ background:#FDEBEA; color:var(--danger); }
+    .ctx-item .kbd{ font-size:11px; color:var(--ink-2); }
+    .ctx-sep{ height:1px; background:var(--line); margin:5px 6px; }
+    .ctx-label{ padding:5px 10px 2px; font-size:11px; color:var(--ink-2); }
+    .ctx-swatches{ display:flex; gap:6px; padding:4px 10px 7px; flex-wrap:wrap; }
+    .swatch{ width:20px; height:20px; border-radius:6px; cursor:pointer; border:1px solid rgba(0,0,0,.12); }
+    .swatch:hover{ transform:scale(1.15); }
+    .swatch.reset{ background:#fff; position:relative; }
+    .swatch.reset::after{ content:"×"; position:absolute; inset:0; display:flex;
+        align-items:center; justify-content:center; color:var(--ink-2); font-size:13px; }
 
-/* 節點行內編輯框 */
-.node-editor{
-  position:absolute;z-index:20;
-  border:1.5px solid var(--accent);border-radius:6px;
-  background:var(--card);color:var(--ink);
-  padding:0 8px;box-shadow:var(--shadow);
-  font-family:var(--serif);
-}
-.node-editor:focus{outline:none}
+    /* ============ 左側固定面板（心智圖清單；使用者手動開合） ============ */
+    #mainRow{ display:flex; flex:1; min-height:0; }
+    #drawer{
+        flex:0 0 300px; width:300px; min-width:0;
+        background:var(--panel); border-right:1px solid var(--line);
+        display:flex; flex-direction:column; overflow:hidden;
+    }
+    #drawer.closed{ display:none; }
+    .drawer-head{
+        flex:0 0 auto; display:flex; align-items:center; gap:6px;
+        padding:12px 12px 10px; border-bottom:1px solid var(--line);
+    }
+    .drawer-head h2{ font-size:15px; flex:1; min-width:0; }
+    #mapList{ flex:1; overflow-y:auto; padding:8px; }
+    .folder-row{
+        display:flex; align-items:center; gap:6px;
+        padding:7px 8px; margin:4px 0 2px; border-radius:8px;
+        cursor:pointer; user-select:none; font-weight:600; color:var(--ink);
+    }
+    .folder-row:hover{ background:rgba(61,138,247,.08); }
+    .folder-row.drop-target,
+    .drawer-sec.drop-target{
+        background:var(--accent-soft);
+        outline:2px dashed var(--accent); outline-offset:-2px; border-radius:8px;
+    }
+    .folder-row .tw{ width:14px; text-align:center; color:var(--ink-2); font-size:11px; }
+    .folder-row .cnt{ margin-left:auto; font-size:11.5px; color:var(--ink-2); font-weight:400; }
+    .drawer-sec{ margin:10px 6px 2px; font-size:11.5px; color:var(--ink-2); }
+    .map-item.nested{ margin-left:18px; }
+    .map-item{
+        border-radius:9px; padding:9px 10px; cursor:pointer; margin-bottom:2px;
+        display:flex; align-items:center; gap:8px;
+    }
+    .map-item:hover{ background:#F2F4F7; }
+    .map-item.current{ background:var(--accent-soft); }
+    .map-item .info{ flex:1; min-width:0; }
+    .map-item .t{ font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .map-item .m{ font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+    .map-item .ops{ display:none; gap:2px; }
+    .map-item:hover .ops{ display:flex; }
+    .mini-btn{
+        border:0; background:transparent; cursor:pointer; border-radius:6px;
+        width:26px; height:26px; font-size:13px; color:var(--ink-2);
+        display:flex; align-items:center; justify-content:center;
+    }
+    .mini-btn:hover{ background:#E7EBF0; color:var(--ink); }
+    .mini-btn.danger:hover{ background:#FDEBEA; color:var(--danger); }
+    .drawer-empty{ padding:24px 14px; color:var(--ink-2); font-size:13px; text-align:center; }
 
-/* 色盤 */
-.palette{
-  position:absolute;z-index:25;display:flex;gap:6px;
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
-  padding:8px 10px;box-shadow:var(--shadow);
-}
-.palette .sw{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);position:relative}
-.palette .sw:hover{transform:scale(1.12)}
-.palette .sw.none{background:
-  linear-gradient(135deg,transparent 44%,var(--accent) 46%,var(--accent) 54%,transparent 56%),var(--card)}
+    /* ============ 演示模式（Pitch，P7） ============ */
+    body.presenting #toolbar,
+    body.presenting #statusbar,
+    body.presenting #sheetBar,
+    body.presenting #stylePanel,
+    body.presenting #drawer{ display:none !important; }
+    body.presenting #stage{ inset:0; }
+    .mm-node, .mm-node *{ transition:opacity .25s ease; }
+    #linkLayer path, #relLayer path, #boundaryLayer rect, #boundaryLayer path,
+    #summaryLayer path{ transition:opacity .25s ease; }
+    #pitchBar{
+        position:fixed; left:18px; bottom:18px; z-index:80;
+        background:rgba(30,34,44,.82); color:#fff; border-radius:10px;
+        padding:10px 16px; font-size:13px; display:flex; align-items:center; gap:14px;
+        box-shadow:0 8px 24px rgba(0,0,0,.25); backdrop-filter:blur(4px);
+    }
+    #pitchBar.hidden{ display:none; }
+    #pitchBar #pitchTitle{ font-weight:600; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #pitchBar #pitchIdx{ color:rgba(255,255,255,.7); }
+    #pitchBar button{
+        border:none; background:rgba(255,255,255,.12); color:#fff; border-radius:6px;
+        width:26px; height:26px; cursor:pointer; font-size:13px; line-height:1;
+    }
+    #pitchBar button:hover{ background:rgba(255,255,255,.22); }
+    #pitchBar #pitchClose{ margin-left:6px; }
 
-/* ---------- 筆記面板 ---------- */
-#notePanel{
-  flex:0 0 360px;max-width:88vw;display:flex;flex-direction:column;
-  background:var(--card);border-left:1px solid var(--line);
-  transition:margin-right .22s ease;z-index:15;
-}
-#notePanel.closed{margin-right:-360px;visibility:hidden}
-@media (prefers-reduced-motion:reduce){#notePanel{transition:none}}
-.np-head{display:flex;align-items:center;gap:8px;padding:12px 14px 8px;border-bottom:1px solid var(--line-soft)}
-.np-head .np-label{font-size:11.5px;color:var(--accent);letter-spacing:.22em;border:1px solid var(--accent);
-  border-radius:4px;padding:1px 6px 1px 8px}
-.np-node-title{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
-.np-tabs{display:flex;gap:2px;padding:8px 14px 0}
-.np-tabs button{padding:5px 14px;font-size:12.5px;letter-spacing:.14em;color:var(--ink-soft);
-  border-bottom:2px solid transparent}
-.np-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
-#npEdit{
-  flex:1;resize:none;border:none;background:transparent;
-  padding:12px 16px;font-size:14px;line-height:1.9;letter-spacing:.02em;
-}
-#npEdit:focus{outline:none}
-#npPreview{flex:1;overflow:auto;padding:12px 16px;font-size:14px;line-height:1.9}
-#npPreview h1,#npPreview h2,#npPreview h3{margin:.7em 0 .35em;letter-spacing:.06em;font-weight:600}
-#npPreview h1{font-size:17px;border-bottom:1px solid var(--line-soft);padding-bottom:.25em}
-#npPreview h2{font-size:15.5px}
-#npPreview h3{font-size:14.5px;color:var(--ink-soft)}
-#npPreview p{margin:.4em 0}
-#npPreview ul,#npPreview ol{margin:.4em 0;padding-left:1.6em}
-#npPreview blockquote{border-left:3px solid var(--line);color:var(--ink-soft);padding:.1em .9em;margin:.5em 0}
-#npPreview code{font-family:var(--mono);font-size:12.5px;background:var(--paper-deep);border-radius:4px;padding:1px 5px}
-#npPreview hr{border:none;border-top:1px solid var(--line);margin:.9em 0}
-#npPreview a{color:var(--accent)}
-#npPreview .md-empty{color:var(--ink-faint);letter-spacing:.1em}
-.np-foot{padding:7px 16px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--ink-faint);
-  display:flex;justify-content:space-between;letter-spacing:.06em}
-.np-hint{flex:1;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);
-  letter-spacing:.14em;font-size:13px;padding:20px;text-align:center;line-height:2}
+    /* ============ 樣式面板（P5） ============ */
+    #stylePanel{
+        position:absolute; top:0; right:0; bottom:0; width:240px;
+        background:var(--panel); border-left:1px solid var(--line);
+        box-shadow:-6px 0 18px rgba(0,0,0,.06);
+        transform:translateX(100%); transition:transform .18s ease;
+        overflow-y:auto; padding:12px 14px 20px; z-index:30;
+        font-size:13px; color:var(--ink);
+    }
+    #stylePanel.open{ transform:none; }
+    .sp-title{ font-weight:700; font-size:14px; margin-bottom:8px; }
+    .sp-sec{ margin:12px 0 6px; font-weight:600; color:var(--ink-2); font-size:12px; }
+    .sp-row{ display:flex; align-items:center; gap:8px; margin:6px 0; }
+    .sp-row label{ font-size:12.5px; color:var(--ink-2); white-space:nowrap; }
+    .sp-row select, #spFillHex{
+        flex:1; min-width:0; border:1px solid var(--line); border-radius:6px;
+        padding:4px 6px; font:inherit; background:#fff;
+    }
+    #spFixedWVal{ width:64px; border:1px solid var(--line); border-radius:6px; padding:4px 6px; font:inherit; }
+    .sp-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+    .sp-grid button{ height:30px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; font-size:14px; }
+    .sp-grid button.active{ border-color:#3D8AF7; box-shadow:inset 0 0 0 1px #3D8AF7; }
+    .sp-colors{ display:flex; flex-wrap:wrap; gap:6px; }
+    .sp-colors span{
+        width:22px; height:22px; border-radius:6px; cursor:pointer;
+        border:1px solid rgba(0,0,0,.12);
+        display:inline-flex; align-items:center; justify-content:center;
+        font-size:11px; color:#888;
+    }
+    .sp-marks{ display:flex; flex-wrap:wrap; gap:4px; }
+    .sp-marks button{ width:30px; height:28px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; font-size:15px; padding:0; }
+    .sp-marks button.active{ border-color:#3D8AF7; background:#EAF2FF; }
+    .sp-row button{ min-width:28px; height:26px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; }
+    .sp-row button.active{ border-color:#3D8AF7; background:#EAF2FF; }
+    #spFontVal{ min-width:24px; text-align:center; font-weight:600; }
 
-/* ---------- 頁籤列 ---------- */
-#tabbar{
-  flex:0 0 auto;display:flex;align-items:center;gap:4px;
-  min-height:42px;padding:5px 10px;
-  border-top:1px solid var(--line);background:var(--paper);
-  overflow-x:auto;scrollbar-width:thin;
-}
-#tabs{display:flex;align-items:center;gap:4px}
-.tab{
-  display:flex;align-items:center;gap:6px;
-  padding:5px 14px;border-radius:8px 8px 0 0;
-  border:1px solid var(--line);border-bottom:none;
-  background:var(--paper-deep);color:var(--ink-soft);
-  font-size:13px;letter-spacing:.06em;cursor:pointer;
-  white-space:nowrap;user-select:none;position:relative;top:5px;
-}
-.tab:hover{color:var(--ink)}
-.tab.active{background:var(--card);color:var(--ink);border-color:var(--line);
-  box-shadow:0 -1px 4px rgba(70,58,34,.06)}
-.tab.active::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;background:var(--accent);border-radius:2px}
-.tab.dragging{opacity:.4}
-.tab input{width:7em;border:none;background:transparent;font-size:13px;padding:0}
-.tab input:focus{outline:none;border-bottom:1px solid var(--accent)}
-.tab-add{
-  width:30px;height:30px;border-radius:8px;color:var(--ink-soft);flex:0 0 auto;
-  display:inline-flex;align-items:center;justify-content:center;margin-left:2px;
-}
-.tab-add:hover{background:var(--paper-deep);color:var(--accent)}
-.tab-add svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round}
+    /* ============ 通用小視窗（連結／備註） ============ */
+    .mm-modal{ position:fixed; inset:0; background:rgba(20,24,32,.45); display:flex; align-items:center; justify-content:center; z-index:60; }
+    .mm-modal.hidden{ display:none; }
+    .mm-modal .box{ background:#fff; border-radius:12px; padding:18px 20px; width:340px; box-shadow:0 12px 40px rgba(0,0,0,.25); font-size:14px; color:#333A45; }
+    .mm-modal .box h3{ margin:0 0 12px; font-size:15px; }
+    .mm-modal .box .row{ margin:8px 0; display:flex; gap:8px; align-items:center; }
+    .mm-modal .box input[type=text], .mm-modal .box textarea{ flex:1; min-width:0; border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:inherit; }
+    .mm-modal .box textarea{ height:120px; resize:vertical; }
+    .mm-modal .hint{ font-size:12px; color:var(--ink-2); }
+    .mm-modal .btns{ display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+    .mm-modal .btns button{ border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 14px; cursor:pointer; font:inherit; }
+    .mm-modal .btns .primary{ background:#3D8AF7; border-color:#3D8AF7; color:#fff; }
+    .mm-modal .btns .danger{ color:#C0392B; }
+    .mm-modal .box.busy .btns button{ opacity:.5; pointer-events:none; }
+    #aiStatus.spin::before{
+        content:''; display:inline-block; width:12px; height:12px; margin-right:6px;
+        border:2px solid #c8ccd6; border-top-color:#3D8AF7; border-radius:50%;
+        vertical-align:-2px; animation:mmspin .7s linear infinite;
+    }
+    @keyframes mmspin{ to{ transform:rotate(360deg); } }
 
-/* ---------- 抽屜（筆記本清單） ---------- */
-#drawer{
-  position:fixed;top:0;left:0;bottom:0;width:308px;max-width:86vw;z-index:60;
-  background:var(--card);border-right:1px solid var(--line);
-  display:flex;flex-direction:column;
-  transition:transform .22s ease;box-shadow:var(--shadow);
-}
-#drawer.closed{transform:translateX(-104%)}
-@media (prefers-reduced-motion:reduce){#drawer{transition:none}}
-.dw-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;border-bottom:1px solid var(--line-soft)}
-.dw-head h2{font-size:14.5px;letter-spacing:.2em;flex:1;font-weight:600}
-#mapList{flex:1;overflow-y:auto;padding:8px}
-.map-item{
-  padding:10px 12px;border-radius:9px;cursor:pointer;position:relative;
-  display:flex;flex-direction:column;gap:3px;
-}
-.map-item:hover{background:var(--paper-deep)}
-.map-item.active{background:var(--accent-wash)}
-.map-item.active::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;background:var(--accent);border-radius:2px}
-.map-item .mi-title{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:26px}
-.map-item .mi-time{font-size:11.5px;color:var(--ink-faint);letter-spacing:.05em}
-.map-item .mi-more{
-  position:absolute;right:6px;top:8px;width:26px;height:26px;border-radius:6px;
-  color:var(--ink-faint);display:none;align-items:center;justify-content:center;font-size:15px;
-}
-.map-item:hover .mi-more{display:inline-flex}
-.map-item .mi-more:hover{background:var(--line-soft);color:var(--ink)}
-.dw-empty{padding:30px 16px;text-align:center;color:var(--ink-faint);font-size:13px;letter-spacing:.1em;line-height:2}
-.dw-foot{padding:10px 16px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--ink-faint);letter-spacing:.08em}
+    /* ============ AI 下拉選單／AI 助手（擴充） ============ */
+    #mainRow{ position:relative; }
+    .tb-drop{ position:relative; display:inline-flex; }
+    #aiMenu{
+        position:fixed; min-width:180px;
+        background:#fff; border:1px solid var(--line); border-radius:10px;
+        box-shadow:0 10px 30px rgba(0,0,0,.15); padding:6px; z-index:80;
+        display:flex; flex-direction:column; gap:2px;
+    }
+    #aiMenu.hidden{ display:none; }
+    #aiMenu button{
+        border:0; background:none; text-align:left; padding:8px 10px;
+        border-radius:8px; cursor:pointer; font:inherit; font-size:13.5px; color:#333A45;
+    }
+    #aiMenu button:hover{ background:#EAF2FF; }
+    #aiChatPanel{
+        position:absolute; top:0; right:0; bottom:0; width:320px;
+        background:var(--panel); border-left:1px solid var(--line);
+        box-shadow:-6px 0 18px rgba(0,0,0,.06);
+        transform:translateX(100%); transition:transform .18s ease;
+        display:flex; flex-direction:column; z-index:35; font-size:13px; color:var(--ink);
+    }
+    #aiChatPanel.open{ transform:none; }
+    #aiChatHead{ display:flex; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); font-weight:700; }
+    #aiChatHead button{ margin-left:auto; border:0; background:none; cursor:pointer; font-size:15px; color:var(--ink-2); }
+    #aiChatMsgs{ flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+    .ai-msg{ max-width:92%; padding:7px 10px; border-radius:10px; white-space:pre-wrap; word-break:break-word; line-height:1.5; }
+    .ai-msg.user{ align-self:flex-end; background:#3D8AF7; color:#fff; border-bottom-right-radius:3px; }
+    .ai-msg.bot{ align-self:flex-start; background:#F0F2F6; color:#333A45; border-bottom-left-radius:3px; }
+    .ai-msg.err{ align-self:flex-start; background:#FDECEA; color:#C0392B; }
+    #aiChatFoot{ border-top:1px solid var(--line); padding:8px 10px; display:flex; gap:6px; }
+    #aiChatInput{ flex:1; min-width:0; border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:inherit; resize:none; height:56px; }
+    #aiChatSend{ align-self:flex-end; border:1px solid #3D8AF7; background:#3D8AF7; color:#fff; border-radius:8px; padding:7px 12px; cursor:pointer; font:inherit; }
+    #aiChatSend:disabled{ opacity:.5; cursor:default; }
 
-.scrim{position:fixed;inset:0;background:rgba(55,51,43,.30);z-index:55}
-.scrim.center{display:flex;align-items:center;justify-content:center;z-index:80}
-.scrim[hidden]{display:none}
+    /* ============ 分頁列（Sheet 頁籤） ============ */
+    #sheetBar{
+        height:32px; flex:0 0 32px; background:var(--panel); border-top:1px solid var(--line);
+        display:flex; align-items:flex-end; gap:4px; padding:0 8px; user-select:none;
+    }
+    #sheetTabs{
+        display:flex; align-items:flex-end; gap:2px;
+        overflow-x:auto; overflow-y:hidden; max-width:calc(100% - 44px);
+        scrollbar-width:thin;
+    }
+    .sheet-tab{
+        padding:5px 14px 4px; font-size:12.5px; color:var(--ink-2);
+        border:1px solid transparent; border-bottom:none; border-radius:8px 8px 0 0;
+        cursor:pointer; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis;
+    }
+    .sheet-tab:hover{ background:#E7EBF0; color:var(--ink); }
+    .sheet-tab.active{
+        background:#FFFFFF; color:var(--ink); font-weight:600;
+        border-color:var(--line); position:relative; top:1px;
+    }
+    #btnAddSheet{
+        width:26px; height:24px; margin-bottom:3px; flex:0 0 auto;
+        border:1px solid var(--line); border-radius:6px; background:transparent;
+        color:var(--ink-2); font-size:15px; line-height:1; cursor:pointer;
+    }
+    #btnAddSheet:hover{ background:#E7EBF0; color:var(--ink); }
 
-/* ---------- 對話框 ---------- */
-.modal{
-  background:var(--card);border:1px solid var(--line);border-radius:14px;
-  width:min(480px,92vw);max-height:86vh;overflow-y:auto;
-  padding:22px 24px;box-shadow:var(--shadow);
-}
-.modal h3{font-size:16px;letter-spacing:.16em;margin-bottom:14px;font-weight:600}
-.modal p{font-size:14px;line-height:1.9;color:var(--ink-soft);margin-bottom:6px}
-.modal label{display:block;font-size:12.5px;color:var(--ink-soft);letter-spacing:.1em;margin:12px 0 5px}
-.modal input[type=text],.modal input[type=url]{
-  width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;
-  background:var(--paper);font-size:14px;
-}
-.modal input:focus{outline:none;border-color:var(--accent)}
-.modal .m-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
-.modal details{margin-top:14px;border:1px solid var(--line-soft);border-radius:9px;padding:10px 14px}
-.modal summary{font-size:13px;cursor:pointer;letter-spacing:.1em;color:var(--ink-soft)}
-.modal ol{margin:8px 0 4px;padding-left:1.5em;font-size:13px;line-height:2;color:var(--ink-soft)}
-.modal .hint{font-size:12px;color:var(--ink-faint);line-height:1.8;margin-top:8px}
+    /* ============ 底部狀態列 ============ */
+    #statusbar{
+        height:26px; flex:0 0 26px; background:var(--panel); border-top:1px solid var(--line);
+        display:flex; align-items:center; gap:16px; padding:0 12px;
+        font-size:11.5px; color:var(--ink-2); user-select:none;
+    }
+    #statusbar .grow{ flex:1; }
 
-/* ---------- 右鍵選單 ---------- */
-.menu{
-  position:fixed;z-index:90;min-width:150px;
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
-  padding:5px;box-shadow:var(--shadow);
-}
-.menu button{
-  display:block;width:100%;text-align:left;padding:7px 14px;border-radius:7px;
-  font-size:13.5px;letter-spacing:.06em;
-}
-.menu button:hover{background:var(--paper-deep)}
-.menu button.danger{color:var(--accent)}
-.menu button.danger:hover{background:var(--accent-wash)}
-.menu .msep{height:1px;background:var(--line-soft);margin:4px 8px}
+    /* ============ Toast 與說明視窗 ============ */
+    #toast{
+        position:fixed; left:50%; bottom:44px; transform:translateX(-50%);
+        background:#2B3440; color:#fff; padding:8px 16px; border-radius:8px;
+        font-size:13px; z-index:80; box-shadow:var(--shadow);
+        opacity:0; transition:opacity .15s; pointer-events:none; max-width:80vw;
+    }
+    #toast.show{ opacity:1; }
+    #toast.err{ background:var(--danger); }
 
-/* ---------- 提示訊息 ---------- */
-#toasts{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);z-index:100;
-  display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
-.toast{
-  background:var(--ink);color:var(--paper);border-radius:9px;
-  padding:9px 18px;font-size:13.5px;letter-spacing:.06em;
-  box-shadow:var(--shadow);max-width:min(560px,88vw);
-  animation:toastin .25s ease;
-}
-.toast.error{background:var(--accent-deep)}
-@keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+    #helpModal{
+        position:fixed; inset:0; z-index:75; background:rgba(20,26,34,.32);
+        display:flex; align-items:center; justify-content:center;
+    }
+    .help-card{
+        width:min(460px, 92vw); background:var(--panel); border-radius:14px;
+        box-shadow:var(--shadow); padding:18px 20px 16px; max-height:82vh; overflow-y:auto;
+    }
+    .help-card h3{ font-size:16px; margin-bottom:10px; }
+    .help-card table{ width:100%; border-collapse:collapse; font-size:13px; }
+    .help-card td{ padding:6px 4px; border-bottom:1px solid var(--line); }
+    .help-card td:first-child{ width:46%; color:var(--ink-2); }
+    kbd{
+        display:inline-block; padding:1px 6px; border:1px solid var(--line);
+        border-bottom-width:2px; border-radius:5px; background:#F7F8FA;
+        font-family:inherit; font-size:11.5px;
+    }
+    .help-close{ margin-top:12px; text-align:right; }
+    .help-card .sec{ font-weight:700; font-size:12.5px; color:#3D8AF7; margin:14px 0 2px; }
+    .help-card .sec:first-of-type{ margin-top:4px; }
 
-@media (max-width:640px){
-  .brand-name{display:none}
-  .map-title{max-width:26vw}
-  #notePanel{position:absolute;right:0;top:0;bottom:0;flex:none;width:min(360px,92vw)}
-  #toolbar .tbtn{width:44px}
-}
+    /* ============ 日式簡約（和風）主題覆寫 ============ */
+    :root{
+        --bg:#F4F1EA;            /* 生成り（和紙底色） */
+        --panel:#FBF9F4;
+        --line:#E2DCCF;
+        --ink:#3B3830;           /* 墨色 */
+        --ink-2:#8B8577;
+        --accent:#8A9A8B;        /* 利休鼠（灰綠） */
+        --accent-soft:#EDEFE8;
+        --warn:#C0955C;
+        --danger:#B25A4A;        /* 朱 */
+        --shadow:0 4px 18px rgba(60,55,45,.10);
+    }
+    body{ letter-spacing:.02em; }
+    #toolbar{ overflow:visible; height:50px; flex-basis:50px; gap:4px;
+              border-bottom:1px solid var(--line); box-shadow:0 1px 0 rgba(60,55,45,.03); }
+    .brand{ font-weight:600; letter-spacing:.14em; }
+    .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--danger); box-shadow:none; }
+    .tb-btn{ border-radius:6px; }
+    .tb-btn:hover{ background:#EDE9DF; }
+    .tb-btn.primary{ background:var(--ink); color:#FBF9F4; }
+    .tb-btn.primary:hover{ background:#55503F; }
+    #mapTitle:hover{ background:#F0EDE4; }
+    #mapTitle:focus{ border-color:var(--accent); background:#fff; }
+    #aiMenu{ border-radius:8px; box-shadow:var(--shadow); border:1px solid var(--line); background:var(--panel); }
+    #aiMenu button:hover{ background:var(--accent-soft); }
+    #toast{ background:var(--ink); }
+    .mm-modal .box{ background:var(--panel); border-radius:10px; }
+    .mm-modal .btns .primary{ background:var(--ink); border-color:var(--ink); }
+    .ai-msg.user{ background:var(--accent); }
+    .ai-msg.bot{ background:#EFEBE1; color:var(--ink); }
+    #aiChatSend{ background:var(--ink); border-color:var(--ink); }
+    #aiStatus.spin::before{ border-top-color:var(--accent); }
+    #ctxMenu{ border-radius:8px; }
+    .ctx-item:hover{ background:var(--accent-soft); }
+    .sp-grid button.active, .sp-row button.active, .sp-marks button.active{
+        border-color:var(--accent); background:var(--accent-soft); box-shadow:none; }
+    #dragGhost{ background:rgba(138,154,139,.14); border-color:var(--accent); }
+    #editor{ border-color:var(--accent); }
+
+    /* 工具列氣泡提示（JS 定位，避免被任何容器裁切） */
+    #tbTip{
+        position:fixed; z-index:90; pointer-events:none;
+        background:var(--ink); color:#FBF9F4; font-size:12px;
+        padding:5px 10px; border-radius:6px; box-shadow:var(--shadow);
+        opacity:0; transition:opacity .1s; white-space:nowrap;
+        transform:translateX(-50%);
+    }
+    #tbTip.show{ opacity:1; }
+    .ico{ width:18px; height:18px; display:block; fill:none; stroke:currentColor;
+          stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+    .ico.sm{ width:12px; height:12px; }
+    .ico.mi{ width:16px; height:16px; display:inline-block; vertical-align:-3px; margin-right:7px; }
+    #btnAiGen{ gap:5px; }
+    #btnAiGen span{ font-size:13px; letter-spacing:.06em; }
+    #aiMenu button{ display:flex; align-items:center; }
+    .ai-menu-sep{ height:1px; background:var(--line); margin:4px 6px; }
+    #aiCfgModal input[type=password]{ flex:1; min-width:0; border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:inherit; }
+
+    /* AI 視窗內的錯誤訊息框（唯讀、可捲動、可複製，不再另開視窗） */
+    #aiErrBox{
+        width:100%; height:180px; resize:vertical; box-sizing:border-box;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;
+        line-height:1.55; white-space:pre; overflow:auto;
+        border:1px solid var(--danger); border-radius:8px; padding:8px; background:#FBF3F1; color:#7a3a2e;
+    }
+    .mm-modal .btns button.mini, button.mini{
+        border:1px solid var(--line); background:#fff; border-radius:7px;
+        padding:4px 10px; cursor:pointer; font:inherit; font-size:12px; color:var(--ink);
+    }
+    button.mini:hover{ background:#EDE9DF; }
+
+    /* 錯誤訊息檢視視窗 */
+    .err-box{ width:min(640px,90vw); }
+    #errText{
+        width:100%; height:280px; resize:vertical; box-sizing:border-box;
+        font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px;
+        line-height:1.6; white-space:pre; overflow:auto;
+        border:1px solid var(--line); border-radius:8px; padding:10px; background:#FBF9F4; color:#3B3830;
+    }
+    #aiStatus.has-error{ cursor:pointer; color:var(--danger); text-decoration:underline dotted; }
+    #aiStatus.has-error:hover{ color:#96412f; }
+    #tbTip::before{
+        content:''; position:absolute; top:-4px; left:50%; transform:translateX(-50%);
+        border:4px solid transparent; border-bottom-color:var(--ink); border-top:0;
+    }
 </style>
 </head>
 <body>
 
-<header id="topbar">
-  <button id="btnDrawer" class="iconbtn" title="筆記本清單" aria-label="筆記本清單">
-    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-  </button>
-  <div class="brand"><span class="brand-seal">圖</span><span class="brand-name">心智圖記事本</span></div>
-  <div id="mapTitle" class="map-title none" title="重新命名筆記本">尚未開啟筆記本</div>
-  <div class="spacer"></div>
-  <div id="saveStatus" class="save-status"><span class="dot"></span><span id="saveStatusText">—</span></div>
-  <button id="btnSave" class="btn">儲存</button>
-  <button id="btnSettings" class="iconbtn" title="連線設定" aria-label="連線設定">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.7a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.7a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/></svg>
-  </button>
-</header>
-
-<main id="main">
-  <div id="canvasWrap">
-    <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
-      <g id="world"><g id="edges"></g><g id="nodesG"></g></g>
+    <!-- 工具列 -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <defs>
+        <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+        <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z M9 4v5h6V4 M8 14h8v6H8z"/></symbol>
+        <symbol id="i-undo" viewBox="0 0 24 24"><path d="M8 6L4 10l4 4 M4 10h10a5 5 0 0 1 0 10h-3"/></symbol>
+        <symbol id="i-redo" viewBox="0 0 24 24"><path d="M16 6l4 4-4 4 M20 10H10a5 5 0 0 0 0 10h3"/></symbol>
+        <symbol id="i-child" viewBox="0 0 24 24"><circle cx="6" cy="8" r="2.6"/><circle cx="17" cy="16" r="2.6"/><path d="M8.6 9.4c3 2.2 3.4 4.6 5.8 5.8"/><path d="M17 6.5v5 M14.5 9h5"/></symbol>
+        <symbol id="i-sibling" viewBox="0 0 24 24"><rect x="4" y="5" width="12" height="5" rx="2"/><rect x="4" y="14" width="12" height="5" rx="2"/><path d="M19 14.5v4 M17 16.5h4"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14 M9 7V5h6v2 M7 7l1 13h8l1-13 M10 11v5 M14 11v5"/></symbol>
+        <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></symbol>
+        <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5"/><circle cx="12" cy="12" r="2.4"/></symbol>
+        <symbol id="i-tidy" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></symbol>
+        <symbol id="i-brush" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19H5v-4z M13 7l4 4"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z M18.5 15.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></symbol>
+        <symbol id="i-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+        <symbol id="i-img" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2.5-2.5L20 17"/></symbol>
+        <symbol id="i-vector" viewBox="0 0 24 24"><path d="M6 18C6 10 18 14 18 6"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/></symbol>
+        <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.2c-.9.5-1.2 1-1.2 2"/><circle cx="12" cy="16.8" r=".4"/></symbol>
+        <symbol id="i-map" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="5" cy="18" r="1.8"/><circle cx="19" cy="18" r="1.8"/><path d="M10 10.5L6.4 7.2 M14 10.5l3.6-3.3 M10 13.5l-3.6 3.3 M14 13.5l3.6 3.3"/></symbol>
+        <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.4"/><path d="M8.4 12h4c2.5 0 3.2-2.5 5.6-2.5 M12.4 12c2.5 0 3.2 2.5 5.6 2.5 M18 5.5v4 M16 7.5h4"/></symbol>
+        <symbol id="i-flow" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="5" rx="1.4"/><rect x="13" y="15" width="7" height="5" rx="1.4"/><path d="M7.5 9v5h9v1 M14.8 13.2l1.7 1.8 1.7-1.8"/></symbol>
+        <symbol id="i-slides" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="11" rx="1.8"/><path d="M12 15v4 M8.5 21h7 M8 8h8 M8 11h5"/></symbol>
+        <symbol id="i-quiz" viewBox="0 0 24 24"><path d="M6 3.5h9l3 3v14H6z"/><path d="M9 9h6 M9 12.5h6 M9 16h3.5"/></symbol>
+        <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20c.5-3 1-4.5 2.5-6L15 5.5a2.1 2.1 0 0 1 3 3L9.5 17c-1.5 1.5-3 2-5.5 3z M13.5 7l3 3"/></symbol>
+        <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17 M12 3.5c-5.5 5-5.5 12 0 17 M12 3.5c5.5 5 5.5 12 0 17"/></symbol>
+        <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-4.5 3.5V16H6a2 2 0 0 1-2-2z"/><path d="M8 8.5h8 M8 11.5h5"/></symbol>
+        <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.4 M12 18.1v2.4 M3.5 12h2.4 M18.1 12h2.4 M6 6l1.7 1.7 M16.3 16.3L18 18 M18 6l-1.7 1.7 M7.7 16.3L6 18"/></symbol>
+        </defs>
     </svg>
+    <header id="toolbar">
+        <button class="tb-btn icon" id="btnDrawer" data-tip="我的心智圖"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg></button>
+        <span class="brand"><span class="dot"></span>心智圖</span>
+        <span class="tb-sep"></span>
+        <input id="mapTitle" type="text" value="" placeholder="未命名心智圖" maxlength="80" />
+        <span id="saveState"></span>
+        <button class="tb-btn icon primary" id="btnSave" data-tip="儲存（Ctrl+S）"><svg class="ico" aria-hidden="true"><use href="#i-save"/></svg></button>
+        <label class="tb-check" data-tip="每 15 秒自動儲存變更">
+            <input type="checkbox" id="chkAutoSave" checked />自動
+        </label>
+        <span class="tb-sep"></span>
+        <button class="tb-btn icon" id="btnUndo" data-tip="復原（Ctrl+Z）"><svg class="ico" aria-hidden="true"><use href="#i-undo"/></svg></button>
+        <button class="tb-btn icon" id="btnRedo" data-tip="重做（Ctrl+Y）"><svg class="ico" aria-hidden="true"><use href="#i-redo"/></svg></button>
+        <span class="tb-sep"></span>
+        <button class="tb-btn icon" id="btnAddChild" data-tip="新增子主題（Tab）"><svg class="ico" aria-hidden="true"><use href="#i-child"/></svg></button>
+        <button class="tb-btn icon" id="btnAddSibling" data-tip="新增同層主題（Enter）"><svg class="ico" aria-hidden="true"><use href="#i-sibling"/></svg></button>
+        <button class="tb-btn icon" id="btnDelete" data-tip="刪除節點（Delete）"><svg class="ico" aria-hidden="true"><use href="#i-trash"/></svg></button>
+        <span class="tb-flex"></span>
+        <button class="tb-btn icon" id="btnZoomOut" data-tip="縮小"><svg class="ico" aria-hidden="true"><use href="#i-minus"/></svg></button>
+        <button class="tb-btn" id="zoomLabel" data-tip="重設為 100%">100%</button>
+        <button class="tb-btn icon" id="btnZoomIn" data-tip="放大"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></button>
+        <button class="tb-btn icon" id="btnFit" data-tip="縮放至全圖（Ctrl+0）"><svg class="ico" aria-hidden="true"><use href="#i-fit"/></svg></button>
+        <button class="tb-btn icon" id="btnTidy" data-tip="自動排列所有浮動主題"><svg class="ico" aria-hidden="true"><use href="#i-tidy"/></svg></button>
+        <button class="tb-btn icon" id="btnStylePanel" data-tip="開關樣式面板"><svg class="ico" aria-hidden="true"><use href="#i-brush"/></svg></button>
+        <button class="tb-btn icon" id="btnPitch" data-tip="開始演示（Pitch）"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <span class="tb-drop">
+            <button class="tb-btn" id="btnAiGen" data-tip="AI 功能選單"><svg class="ico" aria-hidden="true"><use href="#i-spark"/></svg><span>AI</span><svg class="ico sm" aria-hidden="true"><use href="#i-caret"/></svg></button>
+            <div id="aiMenu" class="hidden">
+                <button type="button" data-act="map"><svg class="ico mi" aria-hidden="true"><use href="#i-map"/></svg> AI 心智圖</button>
+                <button type="button" data-act="expand"><svg class="ico mi" aria-hidden="true"><use href="#i-branch"/></svg> AI 產生子主題</button>
+                <button type="button" data-act="flow"><svg class="ico mi" aria-hidden="true"><use href="#i-flow"/></svg> AI 流程圖</button>
+                <button type="button" data-act="slides"><svg class="ico mi" aria-hidden="true"><use href="#i-slides"/></svg> AI 簡報</button>
+                <button type="button" data-act="quiz"><svg class="ico mi" aria-hidden="true"><use href="#i-quiz"/></svg> AI 試卷</button>
+                <button type="button" data-act="draw"><svg class="ico mi" aria-hidden="true"><use href="#i-pen"/></svg> AI 繪圖</button>
+                <button type="button" data-act="search"><svg class="ico mi" aria-hidden="true"><use href="#i-globe"/></svg> 聯網搜索</button>
+                <button type="button" data-act="chat"><svg class="ico mi" aria-hidden="true"><use href="#i-chat"/></svg> AI 助手</button>
+                <div class="ai-menu-sep"></div>
+                <button type="button" data-act="cfg"><svg class="ico mi" aria-hidden="true"><use href="#i-gear"/></svg> AI 設定</button>
+            </div>
+        </span>
+        <span class="tb-sep"></span>
+        <button class="tb-btn icon" id="btnExport" data-tip="匯出 PNG 圖片"><svg class="ico" aria-hidden="true"><use href="#i-img"/></svg></button>
+        <button class="tb-btn icon" id="btnExportSvg" data-tip="匯出 SVG 向量檔"><svg class="ico" aria-hidden="true"><use href="#i-vector"/></svg></button>
+        <button class="tb-btn icon" id="btnHelp" data-tip="快捷鍵說明"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+    </header>
 
-    <div id="toolbar" hidden>
-      <button class="tbtn" id="tbUndo" title="上一步（Ctrl+Z）">
-        <svg viewBox="0 0 24 24"><path d="M8 5 4 9l4 4"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
-        <span>上一步</span>
-      </button>
-      <button class="tbtn" id="tbRedo" title="下一步（Ctrl+Y／Ctrl+Shift+Z）">
-        <svg viewBox="0 0 24 24"><path d="M16 5l4 4-4 4"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
-        <span>下一步</span>
-      </button>
-      <div class="sep"></div>
-      <button class="tbtn" id="tbChild" title="新增子節點（Tab）">
-        <svg viewBox="0 0 24 24"><path d="M3 12h7"/><rect x="10" y="8" width="11" height="8" rx="3"/></svg>
-        <span>子節點</span>
-      </button>
-      <button class="tbtn" id="tbSibling" title="新增同層節點（Enter）">
-        <svg viewBox="0 0 24 24"><rect x="7" y="3" width="11" height="7" rx="3"/><rect x="7" y="14" width="11" height="7" rx="3"/></svg>
-        <span>同層</span>
-      </button>
-      <button class="tbtn" id="tbDelete" title="刪除節點（Delete）">
-        <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>
-        <span>刪除</span>
-      </button>
-      <div class="sep"></div>
-      <button class="tbtn" id="tbNote" title="開啟／關閉筆記面板">
-        <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></svg>
-        <span>筆記</span>
-      </button>
-      <button class="tbtn" id="tbColor" title="節點顏色">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17"/></svg>
-        <span>顏色</span>
-      </button>
-      <div class="sep"></div>
-      <button class="tbtn" id="tbFit" title="縮放至全圖">
-        <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-        <span>全圖</span>
-      </button>
+    <!-- 畫布 -->
+    <div id="mainRow">
+    <aside id="drawer">
+        <div class="drawer-head">
+            <h2>我的心智圖</h2>
+            <button class="tb-btn" id="btnNewFolder" title="新增資料夾">＋資料夾</button>
+            <button class="tb-btn" id="btnNewMap" title="新增心智圖">＋新增</button>
+        </div>
+        <div id="mapList"></div>
+    </aside>
+    <div id="stage">
+        <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+            <defs id="svgDefs"></defs>
+            <g id="viewport">
+                <g id="boundaryLayer"></g>
+                <g id="linkLayer"></g>
+                <g id="summaryLayer"></g>
+                <g id="relLayer"></g>
+                <g id="nodeLayer"></g>
+                <g id="overlayLayer"></g>
+            </g>
+        </svg>
+        <textarea id="editor" class="hidden" rows="1" spellcheck="false"></textarea>
+        <div id="dragGhost" class="hidden"></div>
+        <aside id="stylePanel">
+            <div class="sp-title">樣式</div>
+            <div class="sp-row"><label>主題</label>
+                <select id="spTheme">
+                    <option value="classic">明亮（Classic）</option>
+                    <option value="dark">深色（Dark）</option>
+                </select>
+            </div>
+            <div class="sp-row"><label>結構</label><select id="spStructure"></select></div>
+
+            <div class="sp-sec">形狀</div>
+            <div id="spShapes" class="sp-grid">
+                <button type="button" data-shape="auto" title="自動（依層級）">A</button>
+                <button type="button" data-shape="rounded" title="圓角矩形">▢</button>
+                <button type="button" data-shape="rect" title="矩形">□</button>
+                <button type="button" data-shape="ellipse" title="橢圓">◯</button>
+                <button type="button" data-shape="diamond" title="菱形">◇</button>
+                <button type="button" data-shape="hexagon" title="六角形">⬡</button>
+                <button type="button" data-shape="underline" title="底線">▁</button>
+                <button type="button" data-shape="none" title="純文字">T</button>
+            </div>
+
+            <div class="sp-sec">填色</div>
+            <div id="spFills" class="sp-colors">
+                <span data-fill="#E5534B" style="background:#E5534B"></span>
+                <span data-fill="#EE8435" style="background:#EE8435"></span>
+                <span data-fill="#D6A014" style="background:#D6A014"></span>
+                <span data-fill="#7CA82B" style="background:#7CA82B"></span>
+                <span data-fill="#22A198" style="background:#22A198"></span>
+                <span data-fill="#3D8AF7" style="background:#3D8AF7"></span>
+                <span data-fill="#7C64E8" style="background:#7C64E8"></span>
+                <span data-fill="#D3569B" style="background:#D3569B"></span>
+                <span data-fill="none" title="清除填色">✕</span>
+            </div>
+            <div class="sp-row"><input id="spFillHex" type="text" placeholder="#RRGGBB" maxlength="7" /></div>
+
+            <div class="sp-sec">邊框</div>
+            <div class="sp-row">
+                <select id="spBorderW">
+                    <option value="1">細（1）</option>
+                    <option value="2" selected>中（2）</option>
+                    <option value="3">粗（3）</option>
+                </select>
+                <select id="spBorderDash">
+                    <option value="solid">實線</option>
+                    <option value="dash">虛線</option>
+                </select>
+            </div>
+
+            <div class="sp-sec">文字</div>
+            <div class="sp-row">
+                <button type="button" id="spFontMinus">−</button>
+                <span id="spFontVal">15</span>
+                <button type="button" id="spFontPlus">＋</button>
+                <button type="button" id="spBold" title="粗體"><b>B</b></button>
+                <button type="button" id="spItalic" title="斜體"><i>I</i></button>
+            </div>
+            <div class="sp-row">
+                <label><input type="checkbox" id="spFixedW" /> 固定寬度</label>
+                <input type="number" id="spFixedWVal" value="240" min="60" max="600" />
+            </div>
+
+            <div class="sp-sec">標記</div>
+            <div id="spMarkers" class="sp-marks">
+                <button type="button" data-mk="⭐">⭐</button>
+                <button type="button" data-mk="🚩">🚩</button>
+                <button type="button" data-mk="✅">✅</button>
+                <button type="button" data-mk="❌">❌</button>
+                <button type="button" data-mk="❗">❗</button>
+                <button type="button" data-mk="❓">❓</button>
+                <button type="button" data-mk="👍">👍</button>
+                <button type="button" data-mk="💡">💡</button>
+                <button type="button" data-mk="🔥">🔥</button>
+                <button type="button" data-mk="⏰">⏰</button>
+                <button type="button" data-mk="1️⃣">1️⃣</button>
+                <button type="button" data-mk="2️⃣">2️⃣</button>
+                <button type="button" data-mk="3️⃣">3️⃣</button>
+                <button type="button" data-mk="4️⃣">4️⃣</button>
+                <button type="button" data-mk="5️⃣">5️⃣</button>
+            </div>
+        </aside>
+
+        <div id="ctxMenu" class="hidden"></div>
+    </div>
+    <!-- AI 助手側欄（擴充） -->
+    <div id="aiChatPanel">
+        <div id="aiChatHead">🪐 AI 助手（依目前心智圖回答）<button type="button" id="aiChatClose" title="關閉">✕</button></div>
+        <div id="aiChatMsgs"></div>
+        <div id="aiChatFoot">
+            <textarea id="aiChatInput" placeholder="輸入問題，Enter 送出、Shift+Enter 換行…"></textarea>
+            <button type="button" id="aiChatSend">送出</button>
+        </div>
     </div>
 
-    <div id="zoomBar" hidden>
-      <button id="zOut" title="縮小" aria-label="縮小"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
-      <span id="zoomPct" title="重設為 100%">100%</span>
-      <button id="zIn" title="放大" aria-label="放大"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div><!-- /mainRow -->
+
+    <!-- 超連結視窗（P5） -->
+    <div id="linkModal" class="mm-modal hidden">
+        <div class="box">
+            <h3>超連結</h3>
+            <div class="row">
+                <label><input type="radio" name="lmType" id="lmTypeUrl" checked /> 網址</label>
+                <label><input type="radio" name="lmType" id="lmTypeTopic" /> 主題</label>
+            </div>
+            <div class="row" id="lmUrlRow">
+                <input type="text" id="lmValue" placeholder="https://…" />
+            </div>
+            <div class="row" id="lmTopicRow" style="display:none">
+                <span class="hint" id="lmTopicName">尚未選擇目標主題</span>
+            </div>
+            <div class="hint" id="lmHint">主題模式：按「確定」後點擊畫布上的目標主題。</div>
+            <div class="btns">
+                <button type="button" id="lmRemove" class="danger">移除連結</button>
+                <button type="button" id="lmCancel">取消</button>
+                <button type="button" id="lmOk" class="primary">確定</button>
+            </div>
+        </div>
     </div>
 
-    <div id="emptyHint" class="empty-hint"></div>
-    <input id="nodeEditor" class="node-editor" type="text" hidden>
-    <div id="palettePop" class="palette" hidden></div>
-  </div>
-
-  <aside id="notePanel" class="closed">
-    <div class="np-head">
-      <span class="np-label">筆記</span>
-      <span class="np-node-title" id="npTitle">—</span>
-      <button class="iconbtn" id="npClose" title="關閉" aria-label="關閉筆記面板">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
+    <!-- 錯誤/完整訊息檢視視窗（可捲動、可複製，避免撐爆原本的小視窗） -->
+    <div id="errModal" class="mm-modal hidden">
+        <div class="box err-box">
+            <h3 id="errTitle">錯誤訊息</h3>
+            <textarea id="errText" readonly></textarea>
+            <div class="btns">
+                <button type="button" id="errClose">關閉</button>
+                <button type="button" id="errCopy" class="primary">📋 複製完整訊息</button>
+            </div>
+        </div>
     </div>
-    <div class="np-tabs">
-      <button id="npTabEdit" class="on">編輯</button>
-      <button id="npTabPrev">預覽</button>
+
+    <!-- AI 設定視窗 -->
+    <div id="aiCfgModal" class="mm-modal hidden">
+        <div class="box">
+            <h3>AI 設定</h3>
+            <div class="row"><label style="width:74px;">API Key</label><input type="password" id="cfgKey" placeholder="留空＝維持原金鑰" autocomplete="off" /></div>
+            <div class="row hint" id="cfgKeyHint" style="margin-top:-4px;"></div>
+            <div class="row"><label style="width:74px;">聊天模型</label><input type="text" id="cfgModel" /></div>
+            <div class="row"><label style="width:74px;">繪圖模型</label><input type="text" id="cfgImageModel" /></div>
+            <div class="row"><label style="width:74px;">搜尋模型</label><input type="text" id="cfgSearchModel" /></div>
+            <div class="row"><label style="width:74px;">端點</label><input type="text" id="cfgEndpoint" /></div>
+            <div class="row hint">免費金鑰請至 aistudio.google.com/apikey 申請；設定存於伺服器資料庫，優先於 web.config。</div>
+            <div class="row hint" id="cfgStatus"></div>
+            <div class="btns">
+                <button type="button" id="cfgCancel">取消</button>
+                <button type="button" id="cfgOk" class="primary">儲存</button>
+            </div>
+        </div>
     </div>
-    <textarea id="npEdit" placeholder="在此寫下這個節點的筆記……&#10;支援基本 Markdown：# 標題、**粗體**、- 清單、> 引言"></textarea>
-    <div id="npPreview" hidden></div>
-    <div class="np-hint" id="npHint" hidden>點選畫布上的節點<br>即可編輯它的筆記</div>
-    <div class="np-foot"><span>基本 Markdown</span><span id="npCount">0 字</span></div>
-  </aside>
-</main>
 
-<footer id="tabbar">
-  <div id="tabs"></div>
-  <button id="btnAddPage" class="tab-add" title="新增頁籤" aria-label="新增頁籤" hidden>
-    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-  </button>
-</footer>
-
-<aside id="drawer" class="closed">
-  <div class="dw-head">
-    <h2>筆記本</h2>
-    <button class="iconbtn" id="btnReloadMaps" title="重新整理" aria-label="重新整理清單">
-      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg>
-    </button>
-    <button class="iconbtn" id="btnNewMap" title="新增筆記本" aria-label="新增筆記本">
-      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-    </button>
-    <button class="iconbtn" id="btnDrawerClose" title="關閉" aria-label="關閉清單">
-      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-    </button>
-  </div>
-  <div id="mapList"></div>
-  <div class="dw-foot">資料儲存於你的 Google 試算表</div>
-</aside>
-<div id="drawerScrim" class="scrim" hidden></div>
-
-<div id="modalScrim" class="scrim center" hidden><div id="modalBox" class="modal"></div></div>
-<div id="ctxMenu" class="menu" hidden></div>
-<div id="toasts"></div>
-
-<script>
-'use strict';
-/* =====================================================
- * 心智圖記事本 — 前端（單一 HTML 檔）
- * 後端：Google Apps Script Web App（見 Code.gs）
- * ===================================================== */
-
-/* ---------- 小工具 ---------- */
-const $ = s => document.querySelector(s);
-const LS_API = 'mindnote_api_url';
-const LS_LAST_MAP = 'mindnote_last_map';
-const LS_LAST_PAGE = 'mindnote_last_page';
-const SERIF = '"Noto Serif TC","Source Han Serif TC","Hiragino Mincho ProN","Yu Mincho","PMingLiU",serif';
-
-function uid(p){ return p + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
-function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-function clamp(v,a,b){ return Math.min(b, Math.max(a, v)); }
-
-function toast(msg, type){
-  const el = document.createElement('div');
-  el.className = 'toast' + (type === 'error' ? ' error' : '');
-  el.textContent = msg;
-  $('#toasts').appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, type === 'error' ? 5200 : 3200);
-  setTimeout(() => el.remove(), type === 'error' ? 5700 : 3700);
-}
-
-function relTime(iso){
-  if (!iso) return '';
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return '';
-  const d = Date.now() - t;
-  if (d < 60e3) return '剛剛';
-  if (d < 3600e3) return Math.floor(d/60e3) + ' 分鐘前';
-  if (d < 86400e3) return Math.floor(d/3600e3) + ' 小時前';
-  if (d < 7*86400e3) return Math.floor(d/86400e3) + ' 天前';
-  const dt = new Date(t);
-  return dt.getFullYear() + '/' + (dt.getMonth()+1) + '/' + dt.getDate();
-}
-function nowHM(){
-  const d = new Date();
-  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-}
-
-/* ---------- 對話框 ---------- */
-const modalScrim = $('#modalScrim'), modalBox = $('#modalBox');
-let modalResolve = null;
-
-function openModal(html){
-  modalBox.innerHTML = html;
-  modalScrim.hidden = false;
-  return modalBox;
-}
-function closeModal(val){
-  modalScrim.hidden = true;
-  modalBox.innerHTML = '';
-  if (modalResolve){ const r = modalResolve; modalResolve = null; r(val); }
-}
-modalScrim.addEventListener('pointerdown', e => { if (e.target === modalScrim) closeModal(null); });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !modalScrim.hidden) closeModal(null);
-});
-
-function confirmDlg(title, msg, okLabel){
-  return new Promise(resolve => {
-    modalResolve = resolve;
-    const box = openModal(
-      '<h3>' + esc(title) + '</h3>' +
-      '<p>' + esc(msg) + '</p>' +
-      '<div class="m-foot"><button class="btn" id="mCancel">取消</button>' +
-      '<button class="btn danger" id="mOk">' + esc(okLabel || '確定') + '</button></div>');
-    box.querySelector('#mCancel').onclick = () => closeModal(false);
-    box.querySelector('#mOk').onclick = () => closeModal(true);
-    box.querySelector('#mOk').focus();
-  });
-}
-
-function promptDlg(title, value, placeholder){
-  return new Promise(resolve => {
-    modalResolve = resolve;
-    const box = openModal(
-      '<h3>' + esc(title) + '</h3>' +
-      '<input type="text" id="mInput" value="' + esc(value || '') + '" placeholder="' + esc(placeholder || '') + '">' +
-      '<div class="m-foot"><button class="btn" id="mCancel">取消</button>' +
-      '<button class="btn primary" id="mOk">確定</button></div>');
-    const input = box.querySelector('#mInput');
-    input.focus(); input.select();
-    const commit = () => { const v = input.value.trim(); if (!v){ input.focus(); return; } closeModal(v); };
-    box.querySelector('#mCancel').onclick = () => closeModal(null);
-    box.querySelector('#mOk').onclick = commit;
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); });
-  });
-}
-
-/* ---------- 右鍵選單 ---------- */
-const ctxMenu = $('#ctxMenu');
-function showMenu(x, y, items){
-  ctxMenu.innerHTML = '';
-  items.forEach(it => {
-    if (it === '-'){ const s = document.createElement('div'); s.className = 'msep'; ctxMenu.appendChild(s); return; }
-    const b = document.createElement('button');
-    b.textContent = it.label;
-    if (it.danger) b.className = 'danger';
-    b.onclick = () => { hideMenu(); it.fn(); };
-    ctxMenu.appendChild(b);
-  });
-  ctxMenu.hidden = false;
-  const r = ctxMenu.getBoundingClientRect();
-  ctxMenu.style.left = clamp(x, 6, innerWidth - r.width - 6) + 'px';
-  ctxMenu.style.top = clamp(y, 6, innerHeight - r.height - 6) + 'px';
-}
-function hideMenu(){ ctxMenu.hidden = true; }
-document.addEventListener('pointerdown', e => {
-  if (!ctxMenu.hidden && !ctxMenu.contains(e.target)) hideMenu();
-  if (!palettePop.hidden && !palettePop.contains(e.target) && e.target.closest('#tbColor') == null) palettePop.hidden = true;
-}, true);
-addEventListener('blur', hideMenu);
-
-/* ---------- API 層 ---------- */
-function apiUrl(){ return (localStorage.getItem(LS_API) || '').trim(); }
-const GET_ACTIONS = ['listMaps','listPages','getPage','ping'];
-
-async function api(action, params){
-  const url = apiUrl();
-  if (!url) throw new Error('尚未設定 Apps Script 部署網址');
-  let res;
-  try {
-    if (GET_ACTIONS.includes(action)){
-      const qs = new URLSearchParams(Object.assign({ action }, params || {}));
-      res = await fetch(url + (url.includes('?') ? '&' : '?') + qs.toString(), { method:'GET', redirect:'follow' });
-    } else {
-      res = await fetch(url, {
-        method: 'POST',
-        redirect: 'follow',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 CORS 預檢
-        body: JSON.stringify(Object.assign({ action }, params || {}))
-      });
-    }
-  } catch (e){
-    throw new Error('無法連線（請確認網路與部署網址）');
-  }
-  if (!res.ok) throw new Error('連線失敗（HTTP ' + res.status + '）');
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); }
-  catch (e){ throw new Error('回應格式不正確，請確認部署網址結尾為 /exec，且存取權限為「任何人」'); }
-  if (!data.ok) throw new Error(data.error || '後端回報未知錯誤');
-  return data;
-}
-
-/* ---------- 狀態 ---------- */
-const state = {
-  maps: [],
-  currentMapId: null,
-  pages: [],
-  currentPageId: null,
-  nodes: [],            // {NodeID,ParentID,Text,Note,OrderIndex,X,Y,Color}
-  selId: null,
-  collapsed: new Set(), // 僅本次瀏覽有效（不入庫）
-  pan: { x: 80, y: 200 },
-  zoom: 1,
-  dirty: false,
-  saving: false,
-  saveAgain: false,
-  loadedOnce: false
-};
-let saveTimer = null;
-
-const svg = $('#canvas'), world = $('#world'), edgesG = $('#edges'), nodesG = $('#nodesG');
-const canvasWrap = $('#canvasWrap'), emptyHint = $('#emptyHint');
-const nodeEditor = $('#nodeEditor'), palettePop = $('#palettePop');
-const notePanel = $('#notePanel');
-
-const mcanvas = document.createElement('canvas');
-const mctx = mcanvas.getContext('2d');
-
-function byId(id){ return state.nodes.find(n => n.NodeID === id) || null; }
-function childrenOf(pid){
-  return state.nodes
-    .filter(n => (n.ParentID || '') === (pid || ''))
-    .sort((a, b) => (a.OrderIndex - b.OrderIndex) || (a.NodeID < b.NodeID ? -1 : 1));
-}
-function subtreeIds(id, acc){
-  acc = acc || [];
-  acc.push(id);
-  childrenOf(id).forEach(c => subtreeIds(c.NodeID, acc));
-  return acc;
-}
-function isRoot(n){ return !(n.ParentID || ''); }
-
-/* ---------- 版面量測與佈局 ---------- */
-const PAD_X = 14, PAD_Y = 8, LINE_H = 21, MAX_TEXT_W = 220, H_GAP = 64, V_GAP = 16, ROOT_GAP = 90;
-
-function wrapText(text, font){
-  mctx.font = font;
-  const lines = [];
-  let cur = '';
-  for (const ch of String(text || ' ')){
-    if (ch === '\n'){ lines.push(cur); cur = ''; continue; }
-    const t = cur + ch;
-    if (mctx.measureText(t).width > MAX_TEXT_W && cur){ lines.push(cur); cur = ch; }
-    else cur = t;
-  }
-  lines.push(cur);
-  return lines;
-}
-
-function measureNode(n){
-  const root = isRoot(n);
-  const font = (root ? '600 16px ' : '400 14px ') + SERIF;
-  const lines = wrapText(n.Text || '　', font);
-  mctx.font = font;
-  let w = 0;
-  lines.forEach(l => { w = Math.max(w, mctx.measureText(l).width); });
-  n._font = font; n._lines = lines;
-  n._w = Math.max(root ? 110 : 56, Math.ceil(w) + PAD_X * 2 + (n.Note ? 20 : 0));
-  n._h = lines.length * LINE_H + PAD_Y * 2 + (root ? 6 : 0);
-}
-
-function subtreeH(n){
-  if (state.collapsed.has(n.NodeID)) return n._h;
-  const ch = childrenOf(n.NodeID);
-  if (!ch.length) return n._h;
-  let s = 0;
-  ch.forEach((c, i) => { s += subtreeH(c); if (i) s += V_GAP; });
-  return Math.max(n._h, s);
-}
-
-function place(n, x, y){
-  n._x = (n.X == null) ? x : n.X;
-  n._y = (n.Y == null) ? y : n.Y;
-  if (state.collapsed.has(n.NodeID)) return;
-  const ch = childrenOf(n.NodeID);
-  if (!ch.length) return;
-  let total = 0;
-  ch.forEach((c, i) => { total += subtreeH(c); if (i) total += V_GAP; });
-  let cy = n._y + n._h / 2 - total / 2;
-  for (const c of ch){
-    const sh = subtreeH(c);
-    place(c, n._x + n._w + H_GAP, cy + sh / 2 - c._h / 2);
-    cy += sh + V_GAP;
-  }
-}
-
-function layout(){
-  state.nodes.forEach(measureNode);
-  const roots = childrenOf('');
-  let y = 0;
-  roots.forEach(r => { place(r, 0, y); y += subtreeH(r) + ROOT_GAP; });
-}
-
-/* ---------- 繪製 ---------- */
-function hiddenCount(id){ return subtreeIds(id).length - 1; }
-
-function render(){
-  layout();
-  const eBuf = [], nBuf = [];
-  const visible = new Set();
-  (function walk(pid){
-    childrenOf(pid).forEach(n => {
-      visible.add(n.NodeID);
-      if (!state.collapsed.has(n.NodeID)) walk(n.NodeID);
-    });
-  })('');
-
-  for (const n of state.nodes){
-    if (!visible.has(n.NodeID)) continue;
-    const p = byId(n.ParentID);
-    if (p && visible.has(p.NodeID)){
-      const x1 = p._x + p._w, y1 = p._y + p._h / 2;
-      const x2 = n._x, y2 = n._y + n._h / 2;
-      const mx = (x2 - x1) / 2;
-      eBuf.push('<path class="edge" d="M' + x1 + ' ' + y1 +
-        ' C' + (x1 + mx) + ' ' + y1 + ',' + (x2 - mx) + ' ' + y2 + ',' + x2 + ' ' + y2 + '"/>');
-    }
-  }
-
-  for (const n of state.nodes){
-    if (!visible.has(n.NodeID)) continue;
-    const root = isRoot(n);
-    const sel = n.NodeID === state.selId;
-    const cls = 'node' + (root ? ' root' : '') + (sel ? ' sel' : '');
-    let g = '<g class="' + cls + '" data-node="' + esc(n.NodeID) + '" transform="translate(' + n._x + ',' + n._y + ')">';
-    const strokeAttr = (n.Color && !sel) ? ' style="stroke:' + esc(n.Color) + '"' : '';
-    g += '<rect class="box" width="' + n._w + '" height="' + n._h + '" rx="7"' + strokeAttr + '/>';
-    if (n.Color){
-      g += '<rect class="colorbar" x="0" y="6" width="3.5" height="' + (n._h - 12) + '" rx="2" fill="' + esc(n.Color) + '"/>';
-    }
-    const fs = root ? 16 : 14;
-    g += '<text font-size="' + fs + '"' + (root ? ' font-weight="600"' : '') + '>';
-    n._lines.forEach((l, i) => {
-      g += '<tspan x="' + PAD_X + '" y="' + (PAD_Y + (root ? 3 : 0) + i * LINE_H + LINE_H * 0.76) + '">' + esc(l) + '</tspan>';
-    });
-    g += '</text>';
-    if (n.Note){
-      g += '<g class="noteflag" data-role="note" transform="translate(' + (n._w - 18) + ',' + (n._h / 2 - 6) + ')">' +
-           '<rect x="-3" y="-3" width="17" height="18"/>' +
-           '<path d="M0 1h11M0 5h11M0 9h7"' + (root ? ' style="stroke:#e8b7bf"' : '') + '/></g>';
-    }
-    if (childrenOf(n.NodeID).length){
-      const col = state.collapsed.has(n.NodeID);
-      g += '<g class="toggle" data-role="toggle" transform="translate(' + n._w + ',' + (n._h / 2) + ')">' +
-           '<circle r="8"/>' +
-           '<text text-anchor="middle" y="3.4">' + (col ? hiddenCount(n.NodeID) : '−') + '</text></g>';
-    }
-    g += '</g>';
-    nBuf.push(g);
-  }
-
-  edgesG.innerHTML = eBuf.join('');
-  nodesG.innerHTML = nBuf.join('');
-  applyTransform();
-}
-
-function applyTransform(){
-  world.setAttribute('transform',
-    'translate(' + state.pan.x + ',' + state.pan.y + ') scale(' + state.zoom + ')');
-  $('#zoomPct').textContent = Math.round(state.zoom * 100) + '%';
-}
-
-let rafPending = false;
-function renderSoon(){
-  if (rafPending) return;
-  rafPending = true;
-  requestAnimationFrame(() => { rafPending = false; render(); });
-}
-
-function fitView(){
-  const vis = state.nodes.filter(n => n._x != null);
-  if (!vis.length) return;
-  layout();
-  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
-  const visible = new Set();
-  (function walk(pid){
-    childrenOf(pid).forEach(n => { visible.add(n.NodeID); if (!state.collapsed.has(n.NodeID)) walk(n.NodeID); });
-  })('');
-  state.nodes.forEach(n => {
-    if (!visible.has(n.NodeID)) return;
-    x1 = Math.min(x1, n._x); y1 = Math.min(y1, n._y);
-    x2 = Math.max(x2, n._x + n._w); y2 = Math.max(y2, n._y + n._h);
-  });
-  if (!isFinite(x1)) return;
-  const r = svg.getBoundingClientRect();
-  const pad = 70;
-  const z = clamp(Math.min((r.width - pad * 2) / (x2 - x1), (r.height - pad * 2) / (y2 - y1)), 0.25, 1.15);
-  state.zoom = z;
-  state.pan.x = (r.width - (x2 - x1) * z) / 2 - x1 * z;
-  state.pan.y = (r.height - (y2 - y1) * z) / 2 - y1 * z;
-  applyTransform();
-}
-
-/* ---------- 歷史（上一步／下一步，作用於目前頁籤的節點） ---------- */
-let hist = [], histIdx = -1, lastWasRestore = false;
-const HIST_MAX = 100;
-
-function snapNodes(){
-  return state.nodes.map(n => ({
-    NodeID: n.NodeID, ParentID: n.ParentID, Text: n.Text, Note: n.Note,
-    OrderIndex: n.OrderIndex, X: n.X, Y: n.Y, Color: n.Color
-  }));
-}
-function initHistory(){
-  hist = [{ tag: 'init', nodes: snapNodes() }];
-  histIdx = 0;
-  lastWasRestore = false;
-  updateUndoUI();
-}
-function pushHistory(tag){
-  if (!state.currentPageId) return;
-  hist = hist.slice(0, histIdx + 1); // 有新操作就截斷重做尾巴
-  const top = hist[histIdx];
-  if (tag && !lastWasRestore && top && top.tag === tag){
-    top.nodes = snapNodes(); // 連續同類操作合併為一步（例如同一節點的筆記輸入）
-  } else {
-    hist.push({ tag: tag || '', nodes: snapNodes() });
-    if (hist.length > HIST_MAX) hist.shift();
-    histIdx = hist.length - 1;
-  }
-  lastWasRestore = false;
-  updateUndoUI();
-}
-function restoreFrom(idx){
-  const snap = hist[idx];
-  if (!snap) return;
-  state.nodes = snap.nodes.map(n => Object.assign({}, n));
-  if (state.selId && !byId(state.selId)) state.selId = null;
-  lastWasRestore = true;
-  markDirty(); // 復原也是變更，會照常自動儲存
-  refreshNotePanel();
-  render();
-  updateUndoUI();
-}
-function undo(){ if (histIdx > 0){ histIdx--; restoreFrom(histIdx); } }
-function redo(){ if (histIdx < hist.length - 1){ histIdx++; restoreFrom(histIdx); } }
-function updateUndoUI(){
-  $('#tbUndo').disabled = histIdx <= 0;
-  $('#tbRedo').disabled = histIdx >= hist.length - 1;
-}
-
-/* ---------- 節點操作 ---------- */
-function renumberSiblings(pid){
-  childrenOf(pid).forEach((c, i) => { c.OrderIndex = i + 1; });
-}
-
-function selectNode(id, opt){
-  state.selId = id;
-  refreshNotePanel();
-  if (!(opt && opt.skipRender)) render();
-}
-
-function ensureRoot(){
-  if (!childrenOf('').length){
-    state.nodes.push({ NodeID: uid('n'), ParentID: '', Text: '中心主題', Note: '',
-                       OrderIndex: 1, X: null, Y: null, Color: '' });
-    markDirty();
-  }
-}
-
-function addChild(pid){
-  const parent = byId(pid || state.selId) || childrenOf('')[0];
-  if (!parent){ return; }
-  state.collapsed.delete(parent.NodeID);
-  const n = { NodeID: uid('n'), ParentID: parent.NodeID, Text: '子主題', Note: '',
-              OrderIndex: childrenOf(parent.NodeID).length + 1, X: null, Y: null, Color: '' };
-  state.nodes.push(n);
-  markDirty();
-  pushHistory();
-  selectNode(n.NodeID);
-  editNode(n.NodeID, true);
-}
-
-function addSibling(){
-  const sel = byId(state.selId);
-  if (!sel){ return; }
-  if (isRoot(sel)){ addChild(sel.NodeID); return; }
-  const n = { NodeID: uid('n'), ParentID: sel.ParentID, Text: '子主題', Note: '',
-              OrderIndex: sel.OrderIndex + 0.5, X: null, Y: null, Color: '' };
-  state.nodes.push(n);
-  renumberSiblings(sel.ParentID);
-  markDirty();
-  pushHistory();
-  selectNode(n.NodeID);
-  editNode(n.NodeID, true);
-}
-
-async function deleteNode(id){
-  const n = byId(id || state.selId);
-  if (!n) return;
-  const ids = subtreeIds(n.NodeID);
-  const hasStuff = ids.length > 1 || (n.Note && n.Note.trim());
-  if (hasStuff){
-    const ok = await confirmDlg('刪除節點',
-      ids.length > 1
-        ? '「' + (n.Text || '未命名') + '」與其 ' + (ids.length - 1) + ' 個子節點將一併刪除。'
-        : '「' + (n.Text || '未命名') + '」含有筆記內容，確定刪除？', '刪除');
-    if (!ok) return;
-  }
-  const del = new Set(ids);
-  state.nodes = state.nodes.filter(x => !del.has(x.NodeID));
-  ids.forEach(i => state.collapsed.delete(i));
-  renumberSiblings(n.ParentID || '');
-  state.selId = (n.ParentID && byId(n.ParentID)) ? n.ParentID : null;
-  ensureRoot();
-  markDirty();
-  pushHistory();
-  refreshNotePanel();
-  render();
-}
-
-/* ---------- 行內編輯 ---------- */
-let editingId = null;
-
-function editNode(id, selectAll){
-  const n = byId(id);
-  if (!n) return;
-  render();
-  editingId = id;
-  const left = state.pan.x + n._x * state.zoom;
-  const top = state.pan.y + n._y * state.zoom;
-  nodeEditor.style.left = left + 'px';
-  nodeEditor.style.top = top + 'px';
-  nodeEditor.style.width = Math.max(150, n._w * state.zoom + 8) + 'px';
-  nodeEditor.style.height = Math.max(30, n._h * state.zoom) + 'px';
-  nodeEditor.style.fontSize = (isRoot(n) ? 16 : 14) * state.zoom + 'px';
-  nodeEditor.value = n.Text || '';
-  nodeEditor.hidden = false;
-  nodeEditor.focus();
-  if (selectAll) nodeEditor.select();
-}
-
-function commitEditor(){
-  if (editingId == null) return;
-  const n = byId(editingId);
-  editingId = null;
-  nodeEditor.hidden = true;
-  if (n){
-    const v = nodeEditor.value.trim();
-    if (v !== n.Text){ n.Text = v || '未命名'; markDirty(); pushHistory(); }
-    refreshNotePanel();
-  }
-  render();
-}
-function cancelEditor(){ editingId = null; nodeEditor.hidden = true; }
-
-nodeEditor.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key === 'Enter'){ e.preventDefault(); commitEditor(); }
-  else if (e.key === 'Escape'){ e.preventDefault(); cancelEditor(); render(); }
-  else if (e.key === 'Tab'){ e.preventDefault(); const id = editingId; commitEditor(); if (id) addChild(id); }
-});
-nodeEditor.addEventListener('blur', () => { if (editingId != null) commitEditor(); });
-
-/* ---------- 畫布互動 ---------- */
-const ptr = { mode: null, id: null, sx: 0, sy: 0, ox: 0, oy: 0, moved: false, role: null };
-
-function toWorld(cx, cy){
-  const r = svg.getBoundingClientRect();
-  return { x: (cx - r.left - state.pan.x) / state.zoom,
-           y: (cy - r.top - state.pan.y) / state.zoom };
-}
-
-svg.addEventListener('pointerdown', e => {
-  if (e.button === 2) return;
-  hideMenu(); palettePop.hidden = true;
-  if (editingId != null) commitEditor();
-  const g = e.target.closest('[data-node]');
-  const roleEl = e.target.closest('[data-role]');
-  ptr.sx = e.clientX; ptr.sy = e.clientY; ptr.moved = false;
-  ptr.role = roleEl ? roleEl.getAttribute('data-role') : null;
-  if (g){
-    ptr.mode = 'node';
-    ptr.id = g.getAttribute('data-node');
-    const n = byId(ptr.id);
-    ptr.ox = n ? n._x : 0; ptr.oy = n ? n._y : 0;
-    if (state.selId !== ptr.id) selectNode(ptr.id);
-  } else {
-    ptr.mode = 'pan';
-    ptr.ox = state.pan.x; ptr.oy = state.pan.y;
-  }
-  svg.setPointerCapture(e.pointerId);
-});
-
-svg.addEventListener('pointermove', e => {
-  if (!ptr.mode) return;
-  const dx = e.clientX - ptr.sx, dy = e.clientY - ptr.sy;
-  if (!ptr.moved && Math.hypot(dx, dy) < 4) return;
-  ptr.moved = true;
-  if (ptr.mode === 'pan'){
-    state.pan.x = ptr.ox + dx;
-    state.pan.y = ptr.oy + dy;
-    applyTransform();
-  } else if (ptr.mode === 'node' && !ptr.role){
-    const n = byId(ptr.id);
-    if (!n) return;
-    n.X = Math.round(ptr.ox + dx / state.zoom);
-    n.Y = Math.round(ptr.oy + dy / state.zoom);
-    markDirty();
-    renderSoon();
-  }
-});
-
-svg.addEventListener('pointerup', e => {
-  const mode = ptr.mode, moved = ptr.moved, role = ptr.role, id = ptr.id;
-  ptr.mode = null;
-  if (moved){
-    if (mode === 'node' && !role) pushHistory(); // 拖曳節點完成 → 記一步
-    return;
-  }
-  if (mode === 'node' && role === 'toggle'){
-    if (state.collapsed.has(id)) state.collapsed.delete(id);
-    else state.collapsed.add(id);
-    render();
-  } else if (mode === 'node' && role === 'note'){
-    openNotePanel();
-  } else if (mode === 'pan'){
-    selectNode(null);
-  }
-});
-
-svg.addEventListener('dblclick', e => {
-  const g = e.target.closest('[data-node]');
-  if (g) editNode(g.getAttribute('data-node'), true);
-});
-
-svg.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  const g = e.target.closest('[data-node]');
-  if (!g) return;
-  const id = g.getAttribute('data-node');
-  selectNode(id);
-  showMenu(e.clientX, e.clientY, [
-    { label: '新增子節點', fn: () => addChild(id) },
-    { label: '新增同層節點', fn: () => addSibling() },
-    { label: '編輯文字', fn: () => editNode(id, true) },
-    { label: '開啟筆記', fn: () => openNotePanel() },
-    '-',
-    { label: '刪除節點', danger: true, fn: () => deleteNode(id) }
-  ]);
-});
-
-svg.addEventListener('wheel', e => {
-  e.preventDefault();
-  const r = svg.getBoundingClientRect();
-  const cx = e.clientX - r.left, cy = e.clientY - r.top;
-  const wx = (cx - state.pan.x) / state.zoom, wy = (cy - state.pan.y) / state.zoom;
-  state.zoom = clamp(state.zoom * Math.exp(-e.deltaY * 0.0016), 0.25, 2.5);
-  state.pan.x = cx - wx * state.zoom;
-  state.pan.y = cy - wy * state.zoom;
-  applyTransform();
-}, { passive: false });
-
-document.addEventListener('keydown', e => {
-  const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-  if (!modalScrim.hidden) return;
-  if (!state.currentPageId) return;
-  if (e.key === 'Tab'){ e.preventDefault(); addChild(); }
-  else if (e.key === 'Enter'){ e.preventDefault(); addSibling(); }
-  else if (e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); deleteNode(); }
-  else if (e.key === 'F2'){ e.preventDefault(); if (state.selId) editNode(state.selId, true); }
-  else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')){ e.preventDefault(); redo(); }
-  else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')){ e.preventDefault(); undo(); }
-  else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')){ e.preventDefault(); redo(); }
-  else if (e.key === 'Escape'){ closeNotePanel(); }
-});
-
-/* ---------- 工具列與色盤 ---------- */
-$('#tbUndo').onclick = () => undo();
-$('#tbRedo').onclick = () => redo();
-$('#tbChild').onclick = () => addChild();
-$('#tbSibling').onclick = () => addSibling();
-$('#tbDelete').onclick = () => deleteNode();
-$('#tbNote').onclick = () => toggleNotePanel();
-$('#tbFit').onclick = () => fitView();
-$('#zIn').onclick = () => zoomStep(1.2);
-$('#zOut').onclick = () => zoomStep(1 / 1.2);
-$('#zoomPct').onclick = () => { state.zoom = 1; applyTransform(); };
-
-function zoomStep(f){
-  const r = svg.getBoundingClientRect();
-  const cx = r.width / 2, cy = r.height / 2;
-  const wx = (cx - state.pan.x) / state.zoom, wy = (cy - state.pan.y) / state.zoom;
-  state.zoom = clamp(state.zoom * f, 0.25, 2.5);
-  state.pan.x = cx - wx * state.zoom;
-  state.pan.y = cy - wy * state.zoom;
-  applyTransform();
-}
-
-const PALETTE = [
-  ['', '無'], ['#b5495b', '胭脂'], ['#bf7e45', '金茶'],
-  ['#7a8a5a', '苔'], ['#5c6b73', '藍鼠'], ['#79616f', '紫鼠']
-];
-$('#tbColor').onclick = e => {
-  if (!palettePop.hidden){ palettePop.hidden = true; return; }
-  palettePop.innerHTML = PALETTE.map(([c, name]) =>
-    '<button class="sw' + (c ? '' : ' none') + '" title="' + name + '" data-c="' + c + '"' +
-    (c ? ' style="background:' + c + '"' : '') + '></button>').join('');
-  palettePop.hidden = false;
-  const btnR = e.currentTarget.getBoundingClientRect();
-  const wrapR = canvasWrap.getBoundingClientRect();
-  palettePop.style.left = (btnR.right - wrapR.left + 10) + 'px';
-  palettePop.style.top = (btnR.top - wrapR.top) + 'px';
-  palettePop.querySelectorAll('.sw').forEach(b => {
-    b.onclick = () => {
-      palettePop.hidden = true;
-      const n = byId(state.selId);
-      if (!n){ toast('請先點選一個節點'); return; }
-      n.Color = b.getAttribute('data-c') || '';
-      markDirty();
-      pushHistory();
-      render();
-    };
-  });
-};
-
-/* ---------- 筆記面板與 Markdown ---------- */
-const npEdit = $('#npEdit'), npPreview = $('#npPreview'), npTitle = $('#npTitle');
-const npHint = $('#npHint'), npCount = $('#npCount');
-let npMode = 'edit';
-
-function openNotePanel(){ notePanel.classList.remove('closed'); refreshNotePanel(); if (npMode === 'edit' && byId(state.selId)) npEdit.focus(); }
-function closeNotePanel(){ notePanel.classList.add('closed'); }
-function toggleNotePanel(){ notePanel.classList.contains('closed') ? openNotePanel() : closeNotePanel(); }
-$('#npClose').onclick = closeNotePanel;
-$('#npTabEdit').onclick = () => setNpMode('edit');
-$('#npTabPrev').onclick = () => setNpMode('prev');
-function setNpMode(m){
-  npMode = m;
-  $('#npTabEdit').classList.toggle('on', m === 'edit');
-  $('#npTabPrev').classList.toggle('on', m === 'prev');
-  refreshNotePanel();
-}
-
-function refreshNotePanel(){
-  const n = byId(state.selId);
-  const has = !!n;
-  npTitle.textContent = has ? (n.Text || '未命名') : '—';
-  npHint.hidden = has;
-  npEdit.hidden = !has || npMode !== 'edit';
-  npPreview.hidden = !has || npMode !== 'prev';
-  if (has){
-    if (npMode === 'edit'){
-      if (document.activeElement !== npEdit) npEdit.value = n.Note || '';
-    } else {
-      npPreview.innerHTML = (n.Note && n.Note.trim()) ? mdRender(n.Note) : '<p class="md-empty">（尚無筆記）</p>';
-    }
-    npCount.textContent = (n.Note || '').length + ' 字';
-  } else {
-    npCount.textContent = '0 字';
-  }
-}
-
-npEdit.addEventListener('input', () => {
-  const n = byId(state.selId);
-  if (!n) return;
-  const had = !!(n.Note && n.Note.length);
-  n.Note = npEdit.value;
-  const has = !!n.Note.length;
-  npCount.textContent = n.Note.length + ' 字';
-  markDirty();
-  pushHistory('note:' + n.NodeID);
-  if (had !== has) render(); // 筆記標記出現／消失時重繪節點
-});
-
-function mdInline(s){
-  s = esc(s);
-  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  return s;
-}
-function mdRender(src){
-  const out = [];
-  let list = null;
-  const closeList = () => { if (list){ out.push('</' + list + '>'); list = null; } };
-  for (const line of String(src || '').split('\n')){
-    let m;
-    if (/^\s*$/.test(line)){ closeList(); continue; }
-    if ((m = line.match(/^(#{1,3})\s+(.*)/))){
-      closeList(); const l = m[1].length;
-      out.push('<h' + l + '>' + mdInline(m[2]) + '</h' + l + '>'); continue;
-    }
-    if (/^-{3,}\s*$/.test(line)){ closeList(); out.push('<hr>'); continue; }
-    if ((m = line.match(/^>\s?(.*)/))){ closeList(); out.push('<blockquote>' + mdInline(m[1]) + '</blockquote>'); continue; }
-    if ((m = line.match(/^[-*]\s+(.*)/))){
-      if (list !== 'ul'){ closeList(); out.push('<ul>'); list = 'ul'; }
-      out.push('<li>' + mdInline(m[1]) + '</li>'); continue;
-    }
-    if ((m = line.match(/^\d+[.)]\s+(.*)/))){
-      if (list !== 'ol'){ closeList(); out.push('<ol>'); list = 'ol'; }
-      out.push('<li>' + mdInline(m[1]) + '</li>'); continue;
-    }
-    closeList(); out.push('<p>' + mdInline(line) + '</p>');
-  }
-  closeList();
-  return out.join('');
-}
-
-/* ---------- 儲存與同步 ---------- */
-function setStatus(kind, extra){
-  const el = $('#saveStatus'), tx = $('#saveStatusText');
-  el.className = 'save-status ' + kind;
-  tx.textContent =
-    kind === 'dirty'  ? '未儲存' :
-    kind === 'saving' ? '儲存中…' :
-    kind === 'saved'  ? '已儲存 ' + (extra || nowHM()) :
-    kind === 'error'  ? '儲存失敗' : '—';
-}
-
-function markDirty(){
-  if (!state.currentPageId) return;
-  state.dirty = true;
-  setStatus('dirty');
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveCurrentPage(), 1600);
-}
-
-function serializeNodes(){
-  return state.nodes.map(n => ({
-    nodeId: n.NodeID, parentId: n.ParentID || '',
-    text: n.Text || '', note: n.Note || '',
-    orderIndex: n.OrderIndex || 0,
-    x: n.X == null ? '' : n.X, y: n.Y == null ? '' : n.Y,
-    color: n.Color || ''
-  }));
-}
-
-async function saveCurrentPage(force){
-  clearTimeout(saveTimer);
-  if (!state.currentPageId) return;
-  if (!state.dirty && !force) return;
-  if (state.saving){ state.saveAgain = true; return; }
-  state.saving = true;
-  const pageId = state.currentPageId;
-  const payload = serializeNodes();
-  state.dirty = false;
-  setStatus('saving');
-  try {
-    await api('savePage', { pageId: pageId, nodes: payload });
-    if (!state.dirty) setStatus('saved');
-  } catch (e){
-    state.dirty = true;
-    setStatus('error');
-    toast('儲存失敗：' + e.message, 'error');
-  } finally {
-    state.saving = false;
-    if (state.saveAgain){ state.saveAgain = false; if (state.dirty) saveCurrentPage(); }
-  }
-}
-
-async function flushSave(){
-  clearTimeout(saveTimer);
-  if (state.dirty) await saveCurrentPage(true);
-  let guard = 0;
-  while (state.saving && guard++ < 120) await sleep(80);
-}
-
-$('#btnSave').onclick = () => {
-  if (!state.currentPageId){ toast('尚未開啟任何頁面'); return; }
-  saveCurrentPage(true);
-};
-
-window.addEventListener('beforeunload', e => {
-  if (state.dirty){ e.preventDefault(); e.returnValue = ''; }
-});
-window.addEventListener('pagehide', () => {
-  if (state.dirty && state.currentPageId && apiUrl()){
-    try {
-      navigator.sendBeacon(apiUrl(), new Blob(
-        [JSON.stringify({ action: 'savePage', pageId: state.currentPageId, nodes: serializeNodes() })],
-        { type: 'text/plain;charset=utf-8' }));
-      state.dirty = false;
-    } catch (_){}
-  }
-});
-
-/* ---------- 提示與畫布 UI ---------- */
-function showHint(txt){
-  emptyHint.hidden = false;
-  emptyHint.innerHTML = esc(txt).replace(/\n/g, '<br>');
-}
-function hideHint(){ emptyHint.hidden = true; }
-function setCanvasUI(on){ $('#toolbar').hidden = !on; $('#zoomBar').hidden = !on; }
-
-/* ---------- 頁籤列 ---------- */
-const tabsEl = $('#tabs');
-
-function renderTabs(){
-  tabsEl.innerHTML = '';
-  state.pages.forEach(pg => {
-    const t = document.createElement('div');
-    t.className = 'tab' + (pg.pageId === state.currentPageId ? ' active' : '');
-    t.draggable = true;
-    t.dataset.pid = pg.pageId;
-    const s = document.createElement('span');
-    s.textContent = pg.title;
-    t.appendChild(s);
-    t.addEventListener('click', () => { if (pg.pageId !== state.currentPageId) openPage(pg.pageId); });
-    t.addEventListener('dblclick', () => renameTabInline(t, pg));
-    t.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      showMenu(e.clientX, e.clientY, [
-        { label: '重新命名頁籤', fn: () => renameTabInline(t, pg) },
-        { label: '刪除頁籤', danger: true, fn: () => deletePageAsk(pg) }
-      ]);
-    });
-    t.addEventListener('dragstart', e => {
-      t.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', pg.pageId); } catch (_){}
-    });
-    t.addEventListener('dragend', () => { t.classList.remove('dragging'); commitTabOrder(); });
-    tabsEl.appendChild(t);
-  });
-  $('#btnAddPage').hidden = !state.currentMapId;
-}
-
-tabsEl.addEventListener('dragover', e => {
-  e.preventDefault();
-  const dragging = tabsEl.querySelector('.tab.dragging');
-  if (!dragging) return;
-  const after = [...tabsEl.querySelectorAll('.tab:not(.dragging)')].find(el => {
-    const r = el.getBoundingClientRect();
-    return e.clientX < r.left + r.width / 2;
-  });
-  if (after == null) tabsEl.appendChild(dragging);
-  else tabsEl.insertBefore(dragging, after);
-});
-
-async function commitTabOrder(){
-  const ids = [...tabsEl.querySelectorAll('.tab')].map(el => el.dataset.pid);
-  const cur = state.pages.map(p => p.pageId);
-  if (ids.join() === cur.join()) return;
-  state.pages.sort((a, b) => ids.indexOf(a.pageId) - ids.indexOf(b.pageId));
-  renderTabs();
-  try { await api('reorderPages', { mapId: state.currentMapId, pageIds: ids }); }
-  catch (e){
-    toast('頁籤排序儲存失敗：' + e.message, 'error');
-    if (state.currentMapId) loadPages(state.currentMapId, state.currentPageId);
-  }
-}
-
-function renameTabInline(t, pg){
-  const span = t.querySelector('span');
-  if (!span) return;
-  const input = document.createElement('input');
-  input.value = pg.title;
-  t.replaceChild(input, span);
-  input.focus(); input.select();
-  let done = false;
-  const commit = async () => {
-    if (done) return; done = true;
-    const v = input.value.trim();
-    if (!v || v === pg.title){ renderTabs(); return; }
-    const old = pg.title;
-    pg.title = v;
-    renderTabs();
-    try { await api('renamePage', { pageId: pg.pageId, title: v }); }
-    catch (e){ pg.title = old; renderTabs(); toast('重新命名失敗：' + e.message, 'error'); }
-  };
-  input.addEventListener('keydown', e => {
-    e.stopPropagation();
-    if (e.key === 'Enter') commit();
-    if (e.key === 'Escape'){ done = true; renderTabs(); }
-  });
-  input.addEventListener('blur', commit);
-  input.addEventListener('click', e => e.stopPropagation());
-}
-
-async function deletePageAsk(pg){
-  if (state.pages.length <= 1){ toast('僅剩一個頁籤，無法刪除'); return; }
-  const ok = await confirmDlg('刪除頁籤', '「' + pg.title + '」與其所有節點將一併刪除，無法復原。', '刪除');
-  if (!ok) return;
-  try {
-    if (pg.pageId === state.currentPageId){ clearTimeout(saveTimer); state.dirty = false; }
-    await api('deletePage', { pageId: pg.pageId });
-    const wasCurrent = pg.pageId === state.currentPageId;
-    state.pages = state.pages.filter(p => p.pageId !== pg.pageId);
-    renderTabs();
-    toast('已刪除頁籤「' + pg.title + '」');
-    if (wasCurrent && state.pages.length) openPage(state.pages[0].pageId);
-  } catch (e){ toast('刪除失敗：' + e.message, 'error'); }
-}
-
-$('#btnAddPage').onclick = async () => {
-  if (!state.currentMapId) return;
-  try {
-    const r = await api('createPage', { mapId: state.currentMapId, title: '頁面' + (state.pages.length + 1) });
-    await loadPages(state.currentMapId, r.pageId);
-  } catch (e){ toast('新增頁籤失敗：' + e.message, 'error'); }
-};
-
-/* ---------- 頁面載入 ---------- */
-async function openPage(pageId){
-  await flushSave();
-  state.currentPageId = pageId;
-  localStorage.setItem(LS_LAST_PAGE, pageId);
-  renderTabs();
-  state.nodes = [];
-  state.selId = null;
-  state.collapsed = new Set();
-  edgesG.innerHTML = ''; nodesG.innerHTML = '';
-  showHint('載入頁面中……');
-  try {
-    const r = await api('getPage', { pageId: pageId });
-    if (state.currentPageId !== pageId) return; // 載入期間已切換到別頁
-    state.nodes = r.nodes.map(n => ({
-      NodeID: n.nodeId, ParentID: n.parentId || '',
-      Text: n.text || '', Note: n.note || '',
-      OrderIndex: n.orderIndex || 0,
-      X: (n.x == null ? null : Number(n.x)),
-      Y: (n.y == null ? null : Number(n.y)),
-      Color: n.color || ''
-    }));
-    state.dirty = false;
-    setStatus('idle');
-    ensureRoot(); // 空頁面自動補中心主題（會標記待儲存）
-    const root = childrenOf('')[0];
-    state.selId = root ? root.NodeID : null;
-    initHistory();
-    hideHint();
-    setCanvasUI(true);
-    render();
-    fitView();
-    refreshNotePanel();
-  } catch (e){
-    if (state.currentPageId !== pageId) return;
-    showHint('頁面載入失敗\n' + e.message);
-    toast('載入失敗：' + e.message, 'error');
-  }
-}
-
-async function loadPages(mapId, preferPageId){
-  const r = await api('listPages', { mapId: mapId });
-  if (state.currentMapId !== mapId) return;
-  state.pages = r.pages;
-  renderTabs();
-  let pid = preferPageId || localStorage.getItem(LS_LAST_PAGE);
-  if (!state.pages.find(p => p.pageId === pid)) pid = state.pages.length ? state.pages[0].pageId : null;
-  if (pid) await openPage(pid);
-  else { setCanvasUI(false); showHint('此筆記本沒有任何頁籤'); }
-}
-
-/* ---------- 筆記本（Maps） ---------- */
-const drawer = $('#drawer'), drawerScrim = $('#drawerScrim');
-function openDrawer(){ drawer.classList.remove('closed'); drawerScrim.hidden = false; }
-function closeDrawer(){ drawer.classList.add('closed'); drawerScrim.hidden = true; }
-$('#btnDrawer').onclick = openDrawer;
-$('#btnDrawerClose').onclick = closeDrawer;
-drawerScrim.addEventListener('pointerdown', closeDrawer);
-$('#btnReloadMaps').onclick = () => loadMaps();
-
-function setMapTitle(t){
-  const el = $('#mapTitle');
-  if (t){ el.textContent = t; el.classList.remove('none'); }
-  else { el.textContent = '尚未開啟筆記本'; el.classList.add('none'); }
-}
-
-$('#mapTitle').onclick = () => {
-  if (!state.currentMapId) return;
-  const m = state.maps.find(x => x.mapId === state.currentMapId);
-  if (m) renameMapAsk(m);
-};
-
-async function openMap(mapId){
-  await flushSave();
-  const m = state.maps.find(x => x.mapId === mapId);
-  if (!m){ toast('找不到這本筆記本', 'error'); return; }
-  state.currentMapId = mapId;
-  localStorage.setItem(LS_LAST_MAP, mapId);
-  setMapTitle(m.title);
-  closeDrawer();
-  renderMapList();
-  state.currentPageId = null;
-  state.pages = [];
-  renderTabs();
-  setCanvasUI(false);
-  edgesG.innerHTML = ''; nodesG.innerHTML = '';
-  showHint('載入頁籤中……');
-  try { await loadPages(mapId); }
-  catch (e){
-    showHint('頁籤載入失敗\n' + e.message);
-    toast('載入失敗：' + e.message, 'error');
-  }
-}
-
-function renderMapList(){
-  const list = $('#mapList');
-  if (!state.maps.length){
-    list.innerHTML = '<div class="dw-empty">尚無筆記本<br>點右上「＋」建立第一本</div>';
-    return;
-  }
-  list.innerHTML = '';
-  state.maps.forEach(m => {
-    const it = document.createElement('div');
-    it.className = 'map-item' + (m.mapId === state.currentMapId ? ' active' : '');
-    it.innerHTML =
-      '<div class="mi-title">' + esc(m.title) + '</div>' +
-      '<div class="mi-time">' + esc(relTime(m.updatedAt)) + '</div>' +
-      '<button class="mi-more" title="更多" aria-label="更多動作">⋯</button>';
-    it.addEventListener('click', e => {
-      if (e.target.closest('.mi-more')) return;
-      openMap(m.mapId);
-    });
-    const menu = ev => {
-      ev.preventDefault(); ev.stopPropagation();
-      showMenu(ev.clientX, ev.clientY, [
-        { label: '重新命名', fn: () => renameMapAsk(m) },
-        { label: '刪除筆記本', danger: true, fn: () => deleteMapAsk(m) }
-      ]);
-    };
-    it.querySelector('.mi-more').addEventListener('click', menu);
-    it.addEventListener('contextmenu', menu);
-    list.appendChild(it);
-  });
-}
-
-async function renameMapAsk(m){
-  const v = await promptDlg('重新命名筆記本', m.title);
-  if (!v || v === m.title) return;
-  const old = m.title;
-  m.title = v;
-  renderMapList();
-  if (m.mapId === state.currentMapId) setMapTitle(v);
-  try { await api('renameMap', { mapId: m.mapId, title: v }); }
-  catch (e){
-    m.title = old;
-    renderMapList();
-    if (m.mapId === state.currentMapId) setMapTitle(old);
-    toast('重新命名失敗：' + e.message, 'error');
-  }
-}
-
-async function deleteMapAsk(m){
-  const ok = await confirmDlg('刪除筆記本', '「' + m.title + '」與其所有頁籤、節點將一併刪除，無法復原。', '刪除');
-  if (!ok) return;
-  try {
-    if (m.mapId === state.currentMapId){ clearTimeout(saveTimer); state.dirty = false; }
-    await api('deleteMap', { mapId: m.mapId });
-    state.maps = state.maps.filter(x => x.mapId !== m.mapId);
-    if (m.mapId === state.currentMapId) resetWorkspace();
-    renderMapList();
-    toast('已刪除「' + m.title + '」');
-  } catch (e){ toast('刪除失敗：' + e.message, 'error'); }
-}
-
-$('#btnNewMap').onclick = async () => {
-  const v = await promptDlg('新增筆記本', '', '輸入筆記本標題');
-  if (!v) return;
-  try {
-    const r = await api('createMap', { title: v });
-    await loadMaps();
-    openMap(r.mapId);
-  } catch (e){ toast('新增失敗：' + e.message, 'error'); }
-};
-
-async function loadMaps(){
-  const list = $('#mapList');
-  list.innerHTML = '<div class="dw-empty">載入中……</div>';
-  try {
-    const r = await api('listMaps');
-    state.maps = r.maps;
-    renderMapList();
-    return true;
-  } catch (e){
-    list.innerHTML = '<div class="dw-empty">清單載入失敗<br>' + esc(e.message) + '</div>';
-    toast('無法載入筆記本清單：' + e.message, 'error');
-    return false;
-  }
-}
-
-function resetWorkspace(){
-  state.currentMapId = null;
-  state.currentPageId = null;
-  state.pages = [];
-  state.nodes = [];
-  state.selId = null;
-  setMapTitle(null);
-  renderTabs();
-  edgesG.innerHTML = ''; nodesG.innerHTML = '';
-  setCanvasUI(false);
-  setStatus('idle');
-  hist = []; histIdx = -1; updateUndoUI();
-  closeNotePanel();
-  showHint('從左上角開啟筆記本清單\n選擇或建立一本筆記本');
-}
-
-/* ---------- 連線設定 ---------- */
-function openSettings(firstRun){
-  return new Promise(resolve => {
-    modalResolve = resolve;
-    const box = openModal(
-      '<h3>連線設定</h3>' +
-      '<p>本工具將資料儲存在你自己的 Google 試算表，透過 Apps Script 讀寫，跨裝置同步。</p>' +
-      '<label>Apps Script 部署網址（結尾為 /exec）</label>' +
-      '<input type="url" id="setUrl" placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(apiUrl()) + '">' +
-      '<details' + (firstRun ? ' open' : '') + '>' +
-      '<summary>部署步驟</summary>' +
-      '<ol>' +
-      '<li>建立一份新的 Google 試算表</li>' +
-      '<li>「擴充功能」→「Apps Script」，貼上 Code.gs 全部內容並儲存</li>' +
-      '<li>「部署」→「新增部署」→ 類型「網頁應用程式」</li>' +
-      '<li>執行身分「我」；具有存取權的使用者「任何人」</li>' +
-      '<li>複製部署網址貼到上方欄位（Maps／Pages／Nodes 工作表會自動建立，不需手動建表）</li>' +
-      '</ol>' +
-      '<div class="hint">日後更新 Code.gs 後，需「管理部署」→ 編輯 → 版本選「新版本」再部署，程式才會生效（網址不變）。</div>' +
-      '</details>' +
-      '<div class="m-foot">' +
-      (firstRun ? '' : '<button class="btn" id="mCancel">取消</button>') +
-      '<button class="btn primary" id="mOk">測試並儲存</button></div>');
-    const input = box.querySelector('#setUrl');
-    input.focus();
-    const cancel = box.querySelector('#mCancel');
-    if (cancel) cancel.onclick = () => closeModal(false);
-    const okBtn = box.querySelector('#mOk');
-    okBtn.onclick = async () => {
-      const v = input.value.trim();
-      if (!v){ input.focus(); return; }
-      okBtn.disabled = true;
-      okBtn.textContent = '測試中……';
-      const prev = apiUrl();
-      localStorage.setItem(LS_API, v);
-      try {
-        await api('ping');
-        toast('連線成功');
-        closeModal(true);
-      } catch (e){
-        localStorage.setItem(LS_API, prev);
-        okBtn.disabled = false;
-        okBtn.textContent = '測試並儲存';
-        toast('連線測試失敗：' + e.message, 'error');
-      }
-    };
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') okBtn.onclick(); });
-  });
-}
-
-$('#btnSettings').onclick = async () => {
-  const changed = await openSettings(false);
-  if (changed){
-    resetWorkspace();
-    if (await loadMaps()) openDrawer();
-  }
-};
-
-/* ---------- 啟動 ---------- */
-async function init(){
-  setStatus('idle');
-  resetWorkspace();
-  if (!apiUrl()){
-    showHint('首次使用\n請先完成連線設定（貼上 Apps Script 部署網址）');
-    while (!apiUrl()){
-      await openSettings(true);
-      if (!apiUrl()) await sleep(300);
-    }
-  }
-  const ok = await loadMaps();
-  const last = localStorage.getItem(LS_LAST_MAP);
-  if (ok && last && state.maps.find(m => m.mapId === last)) openMap(last);
-  else openDrawer();
-}
-init();
-</script>
+    <!-- AI 生成視窗（P8） -->
+    <div id="aiModal" class="mm-modal hidden">
+        <div class="box">
+            <h3 id="aiTitle">AI 產生子主題</h3>
+            <div class="row" id="aiCountRow">
+                <label>數量</label>
+                <select id="aiCount">
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5" selected>5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                </select>
+            </div>
+            <div class="row"><textarea id="aiExtra" placeholder="補充需求（選填）…"></textarea></div>
+            <div class="row hint" id="aiStatus"></div>
+            <div class="row" id="aiErrRow" style="display:none;">
+                <textarea id="aiErrBox" readonly placeholder="錯誤訊息"></textarea>
+            </div>
+            <div class="row" id="aiErrBtnRow" style="display:none; justify-content:flex-end;">
+                <button type="button" id="aiErrCopy" class="mini">📋 複製訊息</button>
+            </div>
+            <div class="btns">
+                <button type="button" id="aiCancel">取消</button>
+                <button type="button" id="aiOk" class="primary">產生</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 備註視窗（P5） -->
+    <div id="noteModal" class="mm-modal hidden">
+        <div class="box">
+            <h3>備註</h3>
+            <div class="row"><textarea id="nmText" placeholder="輸入備註內容…"></textarea></div>
+            <div class="btns">
+                <button type="button" id="nmRemove" class="danger">移除備註</button>
+                <button type="button" id="nmCancel">取消</button>
+                <button type="button" id="nmOk" class="primary">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pitchBar" class="hidden">
+        <button type="button" id="pitchPrev" title="上一張（←）">‹</button>
+        <span id="pitchTitle"></span>
+        <span id="pitchIdx"></span>
+        <button type="button" id="pitchNext" title="下一張（→）">›</button>
+        <button type="button" id="pitchClose" title="結束演示（Esc）">✕</button>
+    </div>
+
+    <input type="file" id="fileImageInput" accept="image/*" class="hidden" style="display:none" />
+    <input type="file" id="fileAttachInput" class="hidden" style="display:none" />
+
+    <!-- 分頁列（Sheet 頁籤） -->
+    <div id="sheetBar">
+        <div id="sheetTabs"></div>
+        <button id="btnAddSheet" type="button" title="新增頁面">＋</button>
+    </div>
+
+    <!-- 狀態列 -->
+    <footer id="statusbar">
+        <span id="stNodes">節點 0</span>
+        <span id="stZoom">100%</span>
+        <span class="grow"></span>
+        <span>Tab 子主題 ・ Enter 同層 ・ 雙擊編輯 ・ 拖曳節點可搬移 ・ Ctrl+滾輪縮放</span>
+    </footer>
+
+    <!-- 左側抽屜：心智圖清單 -->
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <!-- 快捷鍵說明 -->
+    <div id="helpModal" class="hidden">
+        <div class="help-card">
+            <h3>快捷鍵與操作說明</h3>
+            <div class="sec">編輯節點</div>
+            <table>
+                <tr><td><kbd>Tab</kbd></td><td>新增子主題</td></tr>
+                <tr><td><kbd>Enter</kbd></td><td>新增同層主題（中心主題時為新增分支）</td></tr>
+                <tr><td><kbd>F2</kbd>／<kbd>空白鍵</kbd>／雙擊</td><td>編輯節點文字</td></tr>
+                <tr><td>直接輸入文字</td><td>取代選取節點的文字並進入編輯</td></tr>
+                <tr><td>編輯中 <kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>節點內換行</td></tr>
+                <tr><td>編輯中 <kbd>Esc</kbd></td><td>取消編輯</td></tr>
+                <tr><td><kbd>Delete</kbd>／<kbd>Backspace</kbd></td><td>刪除選取的節點／關聯／外框（含子節點與多選批刪）</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td>摺疊／展開分支</td></tr>
+            </table>
+
+            <div class="sec">選取與移動</div>
+            <table>
+                <tr><td><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></td><td>在節點間移動選取（依結構自動調整方向）</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+點擊</td><td>多選節點（點有連結的節點則直接跳轉）</td></tr>
+                <tr><td><kbd>Shift</kbd>+點擊</td><td>選取連續兄弟區間</td></tr>
+                <tr><td>拖曳節點到空白處</td><td>固定在該位置（連線不斷、兄弟自動重排）；右鍵可取消固定或拆離成浮動主題</td></tr>
+                <tr><td>雙擊畫布空白處</td><td>建立新的浮動主題</td></tr>
+                <tr><td>右鍵畫布空白處</td><td>新增浮動主題／整理浮動主題／AI 生成心智圖…</td></tr>
+            </table>
+
+            <div class="sec">結構與版面（右鍵節點／樣式面板）</div>
+            <table>
+                <tr><td>變更結構…</td><td>切換心智圖／邏輯圖／組織圖／樹狀圖（可整圖或單一分支覆寫）</td></tr>
+                <tr><td>樣式面板</td><td>形狀、填色、邊框、字級粗斜體、固定寬度、emoji 標記、主題深淺</td></tr>
+                <tr><td>加入外框／加入概要</td><td>選取多個同層兄弟後可包外框或加大括號概要</td></tr>
+                <tr><td>建立關聯 →</td><td>拉出帶箭頭的關聯線；雙擊線或標籤可編輯文字，拖中點調彎曲</td></tr>
+                <tr><td>「整理」工具鈕</td><td>自動排列所有散落的浮動主題</td></tr>
+            </table>
+
+            <div class="sec">內容擴充（右鍵節點）</div>
+            <table>
+                <tr><td>超連結…</td><td>連到網址，或連到本圖的另一個主題（點 🔗 跳轉）</td></tr>
+                <tr><td>備註…</td><td>加上文字備註，節點顯示 📝，滑過可預覽</td></tr>
+                <tr><td>插入圖片…／貼上（Ctrl+V）</td><td>為節點加上圖片；點圖片可開新分頁看原圖</td></tr>
+                <tr><td>新增附檔…</td><td>上傳任意檔案，節點下方顯示 📎 檔名，點擊下載</td></tr>
+                <tr><td>AI 產生子主題…</td><td>依主題脈絡由 AI 生成新的子主題（需先設定 AI 金鑰）</td></tr>
+            </table>
+
+            <div class="sec">頁面、演示與檔案</div>
+            <table>
+                <tr><td>下方頁籤列</td><td>點擊切換頁面、雙擊改名、右鍵刪除、＋新增</td></tr>
+                <tr><td>「▶ 演示」工具鈕</td><td>進入簡報模式（←/→/Space 換頁、Home/End、Esc 結束）</td></tr>
+                <tr><td>「✨ AI」工具鈕</td><td>依主題由 AI 生成整份心智圖</td></tr>
+                <tr><td>「匯出 PNG／匯出 SVG」</td><td>將目前頁面匯出為圖片或向量檔</td></tr>
+            </table>
+
+            <div class="sec">檢視與儲存</div>
+            <table>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>復原／重做</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>儲存</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>縮放至全圖置中</td></tr>
+                <tr><td><kbd>Ctrl</kbd>+滾輪</td><td>以游標為中心縮放</td></tr>
+                <tr><td>滾輪／拖曳空白處</td><td>平移畫布</td></tr>
+            </table>
+            <div class="help-close"><button class="tb-btn primary" id="btnHelpClose">關閉</button></div>
+        </div>
+    </div>
+
+    <script src="mindmap.js?v=static2" charset="utf-8"></script>
+    <div id="tbTip"></div>
 </body>
 </html>
