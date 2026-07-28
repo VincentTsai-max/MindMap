@@ -3947,8 +3947,8 @@
                 row.addEventListener('drop', function (ev) {
                     ev.preventDefault();
                     row.classList.remove('drop-target');
-                    var mid = ev.dataTransfer ? parseInt(ev.dataTransfer.getData('text/plain'), 10) : 0;
-                    if (mid > 0) moveMapToFolder(mid, f.folderId);
+                    var mid = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
+                    if (mid) moveMapToFolder(mid, f.folderId);
                 });
                 box.appendChild(row);
                 if (isOpen) {
@@ -3978,8 +3978,8 @@
             sec.addEventListener('drop', function (ev) {
                 ev.preventDefault();
                 sec.classList.remove('drop-target');
-                var mid = ev.dataTransfer ? parseInt(ev.dataTransfer.getData('text/plain'), 10) : 0;
-                if (mid > 0) moveMapToFolder(mid, null);
+                var mid = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
+                if (mid) moveMapToFolder(mid, null);
             });
             box.appendChild(sec);
         }
@@ -4089,7 +4089,7 @@
     }
 
     function moveMapToFolder(mapId, folderId) {
-        return api('movemap', { body: { mapId: mapId, folderId: (folderId == null ? 0 : folderId) } }).then(function (res) {
+        return api('movemap', { body: { mapId: mapId, folderId: (folderId == null ? '' : folderId) } }).then(function (res) {
             if (!res || !res.ok) throw new Error((res && res.error) || '搬移失敗');
             return refreshMapList();
         }).catch(function (e) { toast(e.message, true); });
