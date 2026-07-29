@@ -36,7 +36,38 @@
             tableLine: '#55607A', tableHead: 'rgba(255,255,255,0.08)'
         }
     };
+    /* 簡約：貼近 XMind 的視覺——中心裸字大標、第二層淡色底同色字、第一層漸細絲帶、外框中性灰 */
+    THEMES.minimal = {
+        canvas: '', ink: '#2F3742', inkOnLight: '#2F3742',
+        rootFill: '#34495E',
+        palette: ['#E5534B', '#EE8435', '#D6A014', '#7CA82B', '#22A198', '#3D8AF7', '#7C64E8', '#D3569B'],
+        plainFill: '#FFFFFF', boxedFill: '#FFFFFF',
+        tableLine: '#B9C2CF', tableHead: 'rgba(0,0,0,0.06)',
+        bareCentral: true,   /* 中心主題不畫框，改大字裸標 */
+        tintChildren: true,  /* 第二層淡色底＋同色深字 */
+        taperLinks: true,    /* 第一層連接線改漸細絲帶 */
+        neutralBoundary: true
+    };
     function themeOf() { return THEMES[state.mapTheme] || THEMES.classic; }
+
+    /* 顏色工具：#rrggbb → 淡染 rgba／加深 */
+    function rgbOf(hex) {
+        var m = /^#?([0-9a-fA-F]{6})$/.exec(('' + hex).trim());
+        if (!m) return null;
+        var v = parseInt(m[1], 16);
+        return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+    }
+    function tintOf(hex, a) {
+        var c = rgbOf(hex);
+        if (!c) return '#FFFFFF';
+        return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')';
+    }
+    function darkenOf(hex, k) {
+        var c = rgbOf(hex);
+        if (!c) return '#333A45';
+        function f(v) { var x = Math.round(v * (1 - k)); return (x < 16 ? '0' : '') + x.toString(16); }
+        return '#' + f(c.r) + f(c.g) + f(c.b);
+    }
 
     /* 亮度公式：0.299r+0.587g+0.114b < 140 視為深色 → 配白字 */
     function isDarkColor(hex) {
@@ -66,6 +97,9 @@
                 return mk('rect', withAttrs({ x: r2(x), y: r2(y), width: r2(w), height: r2(h), rx: 2 }));
             case 'ellipse':
                 return mk('ellipse', withAttrs({ cx: r2(x + w / 2), cy: r2(y + h / 2), rx: r2(w / 2), ry: r2(h / 2) }));
+            case 'circle':
+                /* 正圓：量測階段已把 w/h 撐成正方形，這裡取短邊為直徑 */
+                return mk('circle', withAttrs({ cx: r2(x + w / 2), cy: r2(y + h / 2), r: r2(Math.min(w, h) / 2) }));
             case 'diamond':
                 return mk('path', withAttrs({
                     d: 'M ' + r2(x + w / 2) + ' ' + r2(y) +
@@ -390,6 +424,15 @@
             if (pr.font.bold != null) st.fw = pr.font.bold ? 700 : 400;
         }
         if (pr.shape === 'diamond') st.padX = base.padX + 10;   /* 菱形尖角需要更多內距 */
+        var thM = themeOf();
+        /* 簡約主題：中心主題改大字裸標（未被 props 指定形狀時才套用） */
+        if (n.depth === 0 && thM.bareCentral && !pr.shape && !pr.fill && !(pr.font && pr.font.size)) {
+            st.fs = 26; st.fw = 700; st.lineH = 38; st.padX = 10; st.padY = 6;
+        }
+        /* 簡約主題：第 2 層是淡色方框（第 3 層以下才用底線），內距放寬才撐得住框 */
+        if (n.depth === 2 && thM.tintChildren && !pr.shape) {
+            st.padX = 12; st.padY = 6; st.radius = 6; st.boxed = true;
+        }
         n._st = st;
 
         var font = st.fw + ' ' + st.fs + 'px ' + FONT_FAMILY;
@@ -447,6 +490,14 @@
         /* 內部區域模型（座標相對節點左上角） */
         var imgH = (img && img.fileId && img.w && img.h) ? (img.h + 8) : 0;
         var textY = st.padY + imgH;
+        /* 正圓：文字盒必須「內接」於圓，直徑取對角線，否則四角會突出圓外 */
+        if (pr.shape === 'circle') {
+            var cw = Math.max(0, n.w - st.padX * 2), ch = Math.max(0, n.h - st.padY * 2);
+            var dia = Math.ceil(Math.sqrt(cw * cw + ch * ch)) + 14;
+            dia = Math.max(dia, st.minW, n.w, n.h);
+            n.w = dia; n.h = dia;
+        }
+
         n._regions = {
             aligned: !!(markersW || iconsW),
             text: { x: st.padX + markersW, y: textY, w: n.w - st.padX * 2 - markersW - iconsW, h: textH }
@@ -917,8 +968,78 @@
                ' C ' + r2(c1x) + ' ' + r2(s.y) + ', ' + r2(c2x) + ' ' + r2(e.y) + ', ' + r2(e.x) + ' ' + r2(e.y);
     }
 
+    /* 漸細絲帶：沿用 bezierPath 的端點與控制點，改以填色帶狀路徑呈現（stroke 無法沿線變粗細） */
+    function ribbonPath(p, c, w0, w1) {
+        var dir = c.dir;
+        var s = (p.depth === 0) ? { x: p.cx + dir * (p.w / 2 - 4), y: p.cy } : anchorOut(p);
+        var e = anchorIn(c);
+        var dx = Math.abs(e.x - s.x);
+        var c1x = s.x + dir * Math.max(18, dx * 0.4);
+        var c2x = e.x - dir * Math.max(12, dx * 0.3);
+        var a = w0 / 2, b = w1 / 2;
+        return 'M' + r2(s.x) + ' ' + r2(s.y - a) +
+               ' C ' + r2(c1x) + ' ' + r2(s.y - a) + ', ' + r2(c2x) + ' ' + r2(e.y - b) + ', ' + r2(e.x) + ' ' + r2(e.y - b) +
+               ' L ' + r2(e.x) + ' ' + r2(e.y + b) +
+               ' C ' + r2(c2x) + ' ' + r2(e.y + b) + ', ' + r2(c1x) + ' ' + r2(s.y + a) + ', ' + r2(s.x) + ' ' + r2(s.y + a) + ' Z';
+    }
+    var TAPER_OK = { 'mindmap': 1, 'logic-right': 1, 'logic-left': 1 };
+
+    /* 一鍵複製整張圖（PNG）到剪貼簿。
+       註：用 data: URL 而非 blob:（blob 屬 opaque origin 會污染 canvas，toBlob 會丟 SecurityError）；
+           不可改用 btoa()，節點中文會超出 Latin-1 範圍而拋錯。 */
+    function copyMapImage() {
+        var btn = els.btnCopyImg;
+        if (btn) btn.disabled = true;
+        return buildExportSvg().then(function (built) {
+            if (!built || !built.xml) throw new Error('畫布上沒有可複製的內容');
+            var scale = 2;   /* 放大 2 倍，貼到簡報才夠清晰 */
+            var url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(built.xml);
+            return new Promise(function (resolve, reject) {
+                var img = new Image();
+                img.onload = function () {
+                    try {
+                        var cv = document.createElement('canvas');
+                        cv.width = Math.max(1, Math.round(built.w * scale));
+                        cv.height = Math.max(1, Math.round(built.h * scale));
+                        var ctx = cv.getContext('2d');
+                        ctx.fillStyle = (themeOf().canvas || '#FFFFFF');
+                        ctx.fillRect(0, 0, cv.width, cv.height);
+                        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+                        cv.toBlob(function (b) { b ? resolve(b) : reject(new Error('無法產生 PNG')); }, 'image/png');
+                    } catch (err) { reject(err); }
+                };
+                img.onerror = function () { reject(new Error('圖片載入失敗')); };
+                img.src = url;
+            });
+        }).then(function (blob) {
+            if (navigator.clipboard && typeof window.ClipboardItem !== 'undefined') {
+                return navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+                    .then(function () { toast('已複製圖片到剪貼簿'); });
+            }
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (state.title || '心智圖') + '.png';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+            toast('此瀏覽器不支援複製圖片，已改為下載 PNG');
+        }).catch(function (e) {
+            toast('複製失敗：' + (e && e.message ? e.message : e), true);
+        }).then(function () {
+            if (btn) btn.disabled = false;
+        });
+    }
+
     function drawLink(p, c, layer) {
         var stg = STRUCTURES[structureOf(p)] || STRUCTURES['logic-right'];
+        var th0 = themeOf();
+        /* 只有曲線類結構的第一層做絲帶；組織圖／樹狀圖維持直線 */
+        if (th0.taperLinks && c.depth === 1 && TAPER_OK[structureOf(p)]) {
+            layer.appendChild(mk('path', {
+                d: ribbonPath(p, c, 8, 2.6),
+                fill: effColor(c), stroke: 'none', 'data-cid': c.id
+            }));
+            return;
+        }
         var d = stg.linkPath ? stg.linkPath(p, c) : bezierPath(p, c);
         layer.appendChild(mk('path', {
             d: d, fill: 'none',
@@ -938,12 +1059,18 @@
         var branch = (n.depth === 0) ? th.rootFill : effColor(n);
 
         /* 有效繪製樣式：主題預設（依 depth/structure）⊕ props 覆寫 */
-        var defShape = (n.depth <= 1) ? 'rounded' : (st.boxed ? 'rect' : 'underline');
+        var bareCentral = (n.depth === 0 && th.bareCentral && !pr.shape && !pr.fill);
+        var defShape;
+        if (bareCentral) defShape = 'none';
+        else if (n.depth <= 1) defShape = 'rounded';
+        else if (n.depth === 2 && th.tintChildren) defShape = 'rounded';   /* 淡色方框 */
+        else defShape = (st.boxed ? 'rect' : 'underline');
         var shape = pr.shape || defShape;
-        var fill = null;
+        var fill = null, tinted = false;
         if (shape !== 'underline' && shape !== 'none') {
             if (pr.fill != null) fill = pr.fill;
             else if (n.depth <= 1) fill = branch;
+            else if (th.tintChildren) { fill = tintOf(branch, 0.12); tinted = true; }
             else fill = th.plainFill;
         }
         var border = null;
@@ -956,9 +1083,13 @@
         } else if (shape !== 'underline' && shape !== 'none') {
             border = (n.depth <= 1)
                 ? { color: 'rgba(0,0,0,0.10)', width: 1, dash: null }
-                : { color: branch, width: 1.6, dash: null };
+                : { color: branch, width: tinted ? 1.2 : 1.6, dash: null };
         }
-        var textColor = fill ? (isDarkColor(fill) ? '#FFFFFF' : th.inkOnLight) : th.ink;
+        var textColor;
+        if (tinted) textColor = darkenOf(branch, 0.38);                      /* 淡底配同色深字 */
+        else if (fill) textColor = isDarkColor(fill) ? '#FFFFFF' : th.inkOnLight;
+        else if (th.tintChildren && n.depth >= 2) textColor = darkenOf(branch, 0.18);  /* 底線層：彩色字 */
+        else textColor = th.ink;
         if (pr.font && pr.font.color) textColor = pr.font.color;
         var italic = !!(pr.font && pr.font.italic);
 
@@ -1391,7 +1522,9 @@
                 if (!pN || pN.collapsed || !visSet[cl.parentId]) continue;
                 var box = clusterBox(cl.ids);
                 if (!box) continue;
-                var col = (pr && pr.color) ? pr.color : effColor(node(cl.ids[0]) || {});
+                var thB = themeOf();
+                var col = (pr && pr.color) ? pr.color
+                        : (thB.neutralBoundary ? '#A8AEB8' : effColor(node(cl.ids[0]) || {}));
                 /* 面：不吃事件（框內仍可平移/點節點）；框緣另畫 10px 命中帶 */
                 els.boundaryLayer.appendChild(mk('rect', {
                     x: r2(box.x), y: r2(box.y), width: r2(box.w), height: r2(box.h),
@@ -2122,7 +2255,7 @@
     }
 
     function setTheme(name) {
-        var v = (name === 'dark') ? 'dark' : 'classic';
+        var v = THEMES[name] ? name : 'classic';
         if (v === state.mapTheme) return;
         pushUndo();
         state.mapTheme = v;
@@ -3523,7 +3656,7 @@
         state.title = doc.title || '';
         var ms = ('' + (doc.structure || 'mindmap')).toLowerCase();
         state.mapStructure = (ms === 'mindmap' || STRUCT_NAMES[ms]) ? ms : 'mindmap';
-        state.mapTheme = (doc.theme === 'dark') ? 'dark' : 'classic';
+        state.mapTheme = THEMES[doc.theme] ? doc.theme : 'classic';
         state.mapProps = (typeof doc.props === 'string' && doc.props) ? doc.props : null;
 
         state.nodes = {};
@@ -5675,6 +5808,7 @@
         els.btnPitch = $('btnPitch');
         els.btnAiGen = $('btnAiGen');
         els.btnExportSvg = $('btnExportSvg');
+        els.btnCopyImg = $('btnCopyImg');
         els.aiModal = $('aiModal');
         els.aiTitle = $('aiTitle');
         els.aiCountRow = $('aiCountRow');
@@ -5813,6 +5947,7 @@
         });
         if (els.aiCancel) els.aiCancel.addEventListener('click', closeAiModal);
         bindStylePanel();
+        if (els.btnCopyImg) els.btnCopyImg.addEventListener('click', function () { copyMapImage(); });
         $('btnExport').addEventListener('click', exportPNG);
         if (els.btnExportSvg) els.btnExportSvg.addEventListener('click', exportSVG);
         $('btnDrawer').addEventListener('click', function () {
@@ -6004,6 +6139,7 @@
         rangeSelect: rangeSelect,
         removeNodes: removeNodes,
         addBoundary: addBoundary,
+        copyMapImage: copyMapImage,
         boundaryClusters: boundaryClusters,
         normalizeMembers: normalizeMembers,
         removeBoundary: removeBoundary,

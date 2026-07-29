@@ -457,6 +457,7 @@
         <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z M18.5 15.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></symbol>
         <symbol id="i-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
         <symbol id="i-img" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2.5-2.5L20 17"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
         <symbol id="i-vector" viewBox="0 0 24 24"><path d="M6 18C6 10 18 14 18 6"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/></symbol>
         <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.2c-.9.5-1.2 1-1.2 2"/><circle cx="12" cy="16.8" r=".4"/></symbol>
         <symbol id="i-map" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="5" cy="18" r="1.8"/><circle cx="19" cy="18" r="1.8"/><path d="M10 10.5L6.4 7.2 M14 10.5l3.6-3.3 M10 13.5l-3.6 3.3 M14 13.5l3.6 3.3"/></symbol>
@@ -511,6 +512,7 @@
             </div>
         </span>
         <span class="tb-sep"></span>
+        <button class="tb-btn icon" id="btnCopyImg" data-tip="複製圖片到剪貼簿"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg></button>
         <button class="tb-btn icon" id="btnExport" data-tip="匯出 PNG 圖片"><svg class="ico" aria-hidden="true"><use href="#i-img"/></svg></button>
         <button class="tb-btn icon" id="btnExportSvg" data-tip="匯出 SVG 向量檔"><svg class="ico" aria-hidden="true"><use href="#i-vector"/></svg></button>
         <button class="tb-btn icon" id="btnHelp" data-tip="快捷鍵說明"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
@@ -545,6 +547,7 @@
             <div class="sp-row"><label>主題</label>
                 <select id="spTheme">
                     <option value="classic">明亮（Classic）</option>
+                    <option value="minimal">簡約（XMind 風）</option>
                     <option value="dark">深色（Dark）</option>
                 </select>
             </div>
@@ -556,6 +559,7 @@
                 <button type="button" data-shape="rounded" title="圓角矩形">▢</button>
                 <button type="button" data-shape="rect" title="矩形">□</button>
                 <button type="button" data-shape="ellipse" title="橢圓">◯</button>
+                <button type="button" data-shape="circle" title="正圓">●</button>
                 <button type="button" data-shape="diamond" title="菱形">◇</button>
                 <button type="button" data-shape="hexagon" title="六角形">⬡</button>
                 <button type="button" data-shape="underline" title="底線">▁</button>
@@ -826,7 +830,7 @@
         </div>
     </div>
 
-    <script src="mindmap.js?v=static3" charset="utf-8"></script>
+    <script src="mindmap.js?v=static4" charset="utf-8"></script>
     <div id="tbTip"></div>
 </body>
 </html>
