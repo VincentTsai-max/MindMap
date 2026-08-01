@@ -49,6 +49,9 @@
     .tb-btn:hover{ background:#EEF1F5; }
     .tb-btn:disabled{ opacity:.35; cursor:default; }
     .tb-btn:disabled:hover{ background:transparent; }
+    /* 「目前模式下不適用」的按鈕：淡化但仍可點（disabled 不會觸發 mouseover，氣泡提示會失效） */
+    .tb-btn.off{ opacity:.35; }
+    .tb-btn.off:hover{ background:transparent; }
     .tb-btn.primary{ background:var(--accent); color:#fff; font-weight:600; }
     .tb-btn.primary:hover{ background:#2F79E6; }
     .tb-btn.icon{ width:32px; padding:0; justify-content:center; font-size:15px; }
@@ -135,6 +138,16 @@
         cursor:pointer; user-select:none; font-weight:600; color:var(--ink);
     }
     .folder-row:hover{ background:rgba(61,138,247,.08); }
+    /* 作用中資料夾：「＋新增」「＋資料夾」的落點，左側加一條強調色軸線 */
+    .folder-row.active{
+        background:var(--accent-soft);
+        box-shadow:inset 3px 0 0 var(--accent);
+    }
+    .drawer-sec.active{
+        color:var(--accent); font-weight:600;
+        box-shadow:inset 3px 0 0 var(--accent); padding-left:6px; border-radius:4px;
+    }
+    .drawer-sec{ cursor:pointer; }
     .folder-row.drop-target,
     .drawer-sec.drop-target{
         background:var(--accent-soft);
@@ -458,6 +471,9 @@
         <symbol id="i-caret" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
         <symbol id="i-img" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2.5-2.5L20 17"/></symbol>
         <symbol id="i-balance" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M14 12h3.5a2 2 0 0 1 2 2v1 M14 12h3.5a2 2 0 0 0 2-2V9 M10 12H6.5a2 2 0 0 0-2 2v1 M10 12H6.5a2 2 0 0 1-2-2V9"/></symbol>
+        <symbol id="i-autolayout" viewBox="0 0 24 24"><circle cx="4.5" cy="12" r="2"/><rect x="13" y="3.5" width="7" height="4" rx="1.2"/><rect x="13" y="10" width="7" height="4" rx="1.2"/><rect x="13" y="16.5" width="7" height="4" rx="1.2"/><path d="M6.5 12h3.5 M10 5.5h3 M10 12h3 M10 18.5h3 M10 5.5v13"/></symbol>
+        <symbol id="i-handlayout" viewBox="0 0 24 24"><path d="M5 3.5l11 5.5-4.6 1.4L9.6 15z"/><rect x="14" y="13" width="6.5" height="6.5" rx="1.4"/><path d="M13.2 12.2l1.6 1.6"/></symbol>
+        <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 4.5v7a6 6 0 0 0 12 0v-7"/><path d="M6 10.5h4.5 M13.5 10.5H18"/><path d="M6 4.5h4.5 M13.5 4.5H18"/></symbol>
         <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
         <symbol id="i-vector" viewBox="0 0 24 24"><path d="M6 18C6 10 18 14 18 6"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/></symbol>
         <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.2c-.9.5-1.2 1-1.2 2"/><circle cx="12" cy="16.8" r=".4"/></symbol>
@@ -496,6 +512,8 @@
         <button class="tb-btn icon" id="btnFit" data-tip="縮放至全圖（Ctrl+0）"><svg class="ico" aria-hidden="true"><use href="#i-fit"/></svg></button>
         <button class="tb-btn icon" id="btnTidy" data-tip="自動排列所有浮動主題"><svg class="ico" aria-hidden="true"><use href="#i-tidy"/></svg></button>
         <button class="tb-btn icon" id="btnRebalance" data-tip="重新平衡左右分支"><svg class="ico" aria-hidden="true"><use href="#i-balance"/></svg></button>
+        <button class="tb-btn icon" id="btnLayoutMode" data-tip="排版模式：自動排列"><svg class="ico" aria-hidden="true"><use id="icoLayoutMode" href="#i-autolayout"/></svg></button>
+        <button class="tb-btn icon" id="btnArrange" data-tip="依目前位置排列"><svg class="ico" aria-hidden="true"><use href="#i-magnet"/></svg></button>
         <button class="tb-btn icon" id="btnStylePanel" data-tip="開關樣式面板"><svg class="ico" aria-hidden="true"><use href="#i-brush"/></svg></button>
         <button class="tb-btn icon" id="btnPitch" data-tip="開始演示（Pitch）"><svg class="ico" aria-hidden="true"><use href="#i-play"/></svg></button>
         <span class="tb-drop">
@@ -791,7 +809,8 @@
                 <tr><td><kbd>Shift</kbd>+點擊</td><td>選取連續兄弟區間</td></tr>
                 <tr><td>拖曳節點到空白處</td><td>固定在該位置（連線不斷、兄弟自動重排）；右鍵可取消固定或拆離成浮動主題</td></tr>
                 <tr><td>雙擊畫布空白處</td><td>建立新的浮動主題</td></tr>
-                <tr><td>右鍵畫布空白處</td><td>新增浮動主題／整理浮動主題／AI 生成心智圖…</td></tr>
+                <tr><td>右鍵畫布空白處</td><td>新增浮動主題／整理浮動主題／切換排版模式／依目前位置排列／AI 生成心智圖…</td></tr>
+                <tr><td>右鍵節點</td><td>除了編輯與結構外，可「以此主題另開一張心智圖」——連同整個子樹（含圖片與附檔）複製成新圖，原圖不動</td></tr>
             </table>
 
             <div class="sec">結構與版面（右鍵節點／樣式面板）</div>
@@ -801,6 +820,24 @@
                 <tr><td>加入外框／加入概要</td><td>選取多個同層兄弟後可包外框或加大括號概要</td></tr>
                 <tr><td>建立關聯 →</td><td>拉出帶箭頭的關聯線；雙擊線或標籤可編輯文字，拖中點調彎曲</td></tr>
                 <tr><td>「整理」工具鈕</td><td>自動排列所有散落的浮動主題</td></tr>
+            </table>
+
+            <div class="sec">排版模式（工具列／右鍵畫布空白處）</div>
+            <table>
+                <tr><td>自動排列</td><td>預設模式。順序由系統決定，可用「重新平衡」讓第一層左右交錯</td></tr>
+                <tr><td>依我的排列</td><td>拖曳節點自由擺放並保留位置，想整齊時再按「依目前位置排列」</td></tr>
+                <tr><td>依目前位置排列</td><td>把你拖出來的位置換算成順序（左右分支圖依上下、組織圖／樹狀圖依左右），再吸附回整齊版面</td></tr>
+                <tr><td>模式的儲存範圍</td><td>每一頁各自記住自己的模式，隨檔案一起儲存</td></tr>
+            </table>
+
+            <div class="sec">資料夾（左側清單）</div>
+            <table>
+                <tr><td>點一下資料夾</td><td>展開／摺疊，同時設為「作用中資料夾」（左側出現色條）。之後按「＋新增」「＋資料夾」就會建在這裡；再點一次取消</td></tr>
+                <tr><td>右鍵資料夾</td><td>在此新增心智圖／新增子資料夾／重新命名／移出到最上層／刪除</td></tr>
+                <tr><td>巢狀層數</td><td>最多 5 層</td></tr>
+                <tr><td>拖曳</td><td>心智圖可拖進資料夾；資料夾也可拖進別的資料夾（不能拖進自己的子資料夾）</td></tr>
+                <tr><td>名稱重複</td><td>同一層之下不可重複。新建時自動改成「名稱 (2)」，重新命名時則會擋下</td></tr>
+                <tr><td>刪除資料夾</td><td>⚠ 連同底下的子資料夾與心智圖一併刪除，無法復原。非空資料夾需輸入名稱二次確認</td></tr>
             </table>
 
             <div class="sec">內容擴充（右鍵節點）</div>
@@ -832,7 +869,7 @@
         </div>
     </div>
 
-    <script src="mindmap.js?v=static8" charset="utf-8"></script>
+    <script src="mindmap.js?v=static10" charset="utf-8"></script>
     <div id="tbTip"></div>
 </body>
 </html>

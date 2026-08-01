@@ -156,6 +156,8 @@
         mapStructure: 'mindmap',
         mapTheme: 'classic',
         mapProps: null,       // 地圖層級 props（JSON 字串原樣進出）
+        activeFolderId: null, // 側欄「作用中資料夾」：＋新增／＋資料夾 的預設落點
+        mapFolderId: null,    // 目前這張圖所在的資料夾（節點抽出子樹時的落點）
         selectedId: null,
         selectedIds: [],      // 多選（P4 起有 UI；恆包含 selectedId）
         selectedRelId: null,  // 選取中的關聯線（與節點選取互斥）
@@ -246,6 +248,10 @@
     /* 重新平衡：把中心主題的第一層子節點依目前順序左右交錯重排 */
     function rebalanceSides() {
         if (!state.centralId) return 0;
+        if (layoutMode() === 'manual') {
+            toast('目前是「依我的排列」模式，重新平衡會蓋掉你排的順序', true);
+            return 0;
+        }
         if (structureOf(node(state.centralId)) !== 'mindmap') {
             toast('只有「心智圖」結構會左右分流，目前結構不適用', true);
             return 0;
@@ -280,6 +286,103 @@
         for (var k in o) { has = true; break; }
         if (!has) return null;
         try { return JSON.stringify(o); } catch (e) { return null; }
+    }
+
+    /* ================= 排版模式（2026-08）=================
+       'auto'   ＝ 自動排列：順序由系統決定，可用重新平衡。
+       'manual' ＝ 依我的排列：自由拖曳擺放，按「依目前位置排列」才把位置換算成順序並吸附整齊。
+       存在 mapProps.layoutMode；mapProps 本來就跟著每一頁的 doc 走，所以「每頁各自設定」是白送的，
+       後端 Code.gs 零改動。也因為進了 serializeDoc，undo / redo 會一起還原。 */
+    function layoutMode() {
+        var pr = safeParseProps(state.mapProps);
+        return (pr && pr.layoutMode === 'manual') ? 'manual' : 'auto';
+    }
+
+    function setLayoutMode(mode) {
+        mode = (mode === 'manual') ? 'manual' : 'auto';
+        if (layoutMode() === mode) return mode;
+        pushUndo();
+        var pr = safeParseProps(state.mapProps) || {};
+        if (mode === 'manual') pr.layoutMode = 'manual';
+        else delete pr.layoutMode;
+        state.mapProps = propsToStr(pr);
+        afterMutate();
+        toast(mode === 'manual' ? '已切換：依我的排列（拖曳自由擺放，按排列鈕吸附）' : '已切換：自動排列');
+        return mode;
+    }
+
+    function toggleLayoutMode() {
+        return setLayoutMode(layoutMode() === 'manual' ? 'auto' : 'manual');
+    }
+
+    /* 依目前位置排列：把自由拖曳出來的座標換算成 side ＋ sortOrder，
+       再清掉所有手動座標，讓自動排版把節點吸附回整齊版面。
+       ★ 排序軸依「父節點的結構」決定：
+         org-down / tree-right 是上下走向、子節點成列或縮排 → 依 X（左右）排序
+         mindmap / logic-right / logic-left → 依 Y（上下）排序
+         中心主題（mindmap）另外先依 X 相對中心決定左右側，再各側依 Y 排序 */
+    function arrangeByPosition() {
+        if (layoutMode() !== 'manual') {
+            toast('請先切換到「依我的排列」模式，再使用依目前位置排列', true);
+            return 0;
+        }
+        var idx = buildChildIndex();          /* 已排除 callout / summary，且各組已按 sortOrder 排好 */
+        var plan = [], pid, p, kids, i, ok;
+        for (pid in idx) {
+            if (!pid) continue;               /* '' ＝ 無父（中心主題與浮動主題的根），不重排 */
+            p = node(pid);
+            if (!p || p.collapsed) continue;  /* 摺疊中的分支沒有實際座標，跳過以免亂排 */
+            if (typeof p.cx !== 'number') continue;
+            kids = idx[pid].slice();
+            if (!kids.length) continue;
+            ok = true;
+            for (i = 0; i < kids.length; i++) {
+                if (typeof kids[i].cx !== 'number' || typeof kids[i].cy !== 'number') { ok = false; break; }
+            }
+            if (ok) plan.push({ p: p, kids: kids });
+        }
+
+        var pinned = [];
+        for (var nk in state.nodes) if (isPinned(state.nodes[nk])) pinned.push(state.nodes[nk]);
+        if (!plan.length && !pinned.length) { toast('目前沒有可以重排的節點'); return 0; }
+
+        var byY = function (a, b) { return (a.cy - b.cy) || (a.cx - b.cx); };
+        var byX = function (a, b) { return (a.cx - b.cx) || (a.cy - b.cy); };
+
+        pushUndo();
+        var moved = 0, sided = 0;
+        for (var q = 0; q < plan.length; q++) {
+            p = plan[q].p;
+            kids = plan[q].kids;
+            var st = structureOf(p);
+            var seq = [], seat = 0;
+            if (p.id === state.centralId && st === 'mindmap') {
+                var R = [], L = [];
+                for (i = 0; i < kids.length; i++) {
+                    var sd = (kids[i].cx < p.cx) ? 'L' : 'R';
+                    if (kids[i].side !== sd) { kids[i].side = sd; sided++; }
+                    (sd === 'L' ? L : R).push(kids[i]);
+                }
+                R.sort(byY); L.sort(byY);
+                seq = R.concat(L);            /* 左右各自獨立成序；共用一組 sortOrder 不互相干擾 */
+            } else {
+                seq = kids.slice();
+                seq.sort((st === 'org-down' || st === 'tree-right') ? byX : byY);
+            }
+            for (i = 0; i < seq.length; i++) {
+                var want = (++seat) * 10;
+                if (seq[i].sortOrder !== want) moved++;
+                seq[i].sortOrder = want;
+            }
+        }
+        for (i = 0; i < pinned.length; i++) { pinned[i].posX = null; pinned[i].posY = null; }
+
+        afterMutate();
+        if (!moved && !sided && !pinned.length) toast('順序沒有變動');
+        else toast('已依目前位置排列（' + moved + ' 個順序調整'
+                   + (sided ? '、' + sided + ' 個換邊' : '')
+                   + (pinned.length ? '、' + pinned.length + ' 個吸附回版面' : '') + '）');
+        return moved + sided + pinned.length;
     }
 
     function blankNode(id, parentId, text, type) {
@@ -789,9 +892,11 @@
         anchorOut: function (n) { return { x: n.cx, y: n.cy + n.h / 2 }; },
         anchorIn: function (n) { return { x: n.cx, y: n.cy - n.h / 2 }; },
         linkPath: function (p, c) {
-            var sx = p.cx, sy = p.cy + p.h / 2;
-            var ex = c.cx, ey = c.cy - c.h / 2;
-            var midY = sy + vGapOrg(c.depth) / 2;
+            /* 自由拖曳到父節點上方時，改從父節點頂邊出發、接子節點底邊，否則肘形線會先向下再倒回來 */
+            var down = !(isPinned(c) && c.cy < p.cy);
+            var sx = p.cx, sy = down ? (p.cy + p.h / 2) : (p.cy - p.h / 2);
+            var ex = c.cx, ey = down ? (c.cy - c.h / 2) : (c.cy + c.h / 2);
+            var midY = sy + (down ? 1 : -1) * vGapOrg(c.depth) / 2;
             return 'M' + r2(sx) + ' ' + r2(sy) +
                    ' V ' + r2(midY) +
                    ' H ' + r2(ex) +
@@ -842,10 +947,14 @@
         anchorOut: function (n) { return { x: n.cx - n.w / 2 + 12, y: n.cy + n.h / 2 }; },
         anchorIn: function (n) { return { x: n.cx - n.w / 2, y: n.cy }; },
         linkPath: function (p, c) {
-            var sx = p.cx - p.w / 2 + 12, sy = p.cy + p.h / 2;
+            var free = isPinned(c);
+            var sx = p.cx - p.w / 2 + 12;
+            /* 被拖到父節點上方 → 從頂邊出發；被拖到左側 → 接子節點的右邊緣 */
+            var sy = (free && c.cy < p.cy) ? (p.cy - p.h / 2) : (p.cy + p.h / 2);
+            var ex = (free && c.cx < sx) ? (c.cx + c.w / 2) : (c.cx - c.w / 2);
             return 'M' + r2(sx) + ' ' + r2(sy) +
                    ' V ' + r2(c.cy) +
-                   ' H ' + r2(c.cx - c.w / 2);
+                   ' H ' + r2(ex);
         },
         togglePos: function (n) { return { x: n.cx - n.w / 2 + 12, y: n.cy + n.h / 2 + 10 }; }
     };
@@ -985,21 +1094,35 @@
     }
     function r2(v) { return Math.round(v * 100) / 100; }
 
-    function anchorOut(n) {   /* 連往子節點的起點 */
-        if (n.depth >= 2) return { x: n.cx + n.dir * n.w / 2, y: n.cy + n.h / 2 };
-        return { x: n.cx + n.dir * n.w / 2, y: n.cy };
+    function anchorOut(n, dir) {   /* 連往子節點的起點 */
+        if (dir == null) dir = n.dir;
+        if (n.depth >= 2) return { x: n.cx + dir * n.w / 2, y: n.cy + n.h / 2 };
+        return { x: n.cx + dir * n.w / 2, y: n.cy };
     }
-    function anchorIn(n) {    /* 從父節點連入的終點 */
-        if (n.depth >= 2) return { x: n.cx - n.dir * n.w / 2, y: n.cy + n.h / 2 };
-        return { x: n.cx - n.dir * n.w / 2, y: n.cy };
+    function anchorIn(n, dir) {    /* 從父節點連入的終點 */
+        if (dir == null) dir = n.dir;
+        if (n.depth >= 2) return { x: n.cx - dir * n.w / 2, y: n.cy + n.h / 2 };
+        return { x: n.cx - dir * n.w / 2, y: n.cy };
+    }
+
+    /* 連接線的有效方向。
+       ★ n.dir 是「排版時決定的邏輯左右」（由 side 推出），不是實際幾何位置。
+         自由拖曳過的節點（isPinned）可能被放到另一側，若仍沿用 n.dir，
+         線會從父節點的另一個邊甩出去、再從子節點的反側插回來 —— 就是「線頭是歪的」。
+         因此釘住的節點改用實際座標關係決定貼哪一邊。 */
+    function linkDir(p, c) {
+        if (isPinned(c) && p && typeof p.cx === 'number' && typeof c.cx === 'number') {
+            return (c.cx < p.cx) ? -1 : 1;
+        }
+        return c.dir;
     }
 
     /* logic／mindmap 的三次貝茲（v1 原線形）。
        ★ 跨結構銜接規則：連接線用「父策略」的 linkPath——形狀跟著父走、端點跟著子走。 */
     function bezierPath(p, c) {
-        var dir = c.dir;
-        var s = (p.depth === 0) ? { x: p.cx + dir * (p.w / 2 - 4), y: p.cy } : anchorOut(p);
-        var e = anchorIn(c);
+        var dir = linkDir(p, c);
+        var s = (p.depth === 0) ? { x: p.cx + dir * (p.w / 2 - 4), y: p.cy } : anchorOut(p, dir);
+        var e = anchorIn(c, dir);
         var dx = Math.abs(e.x - s.x);
         var c1x = s.x + dir * Math.max(18, dx * 0.4);
         var c2x = e.x - dir * Math.max(12, dx * 0.3);
@@ -1009,9 +1132,9 @@
 
     /* 漸細絲帶：沿用 bezierPath 的端點與控制點，改以填色帶狀路徑呈現（stroke 無法沿線變粗細） */
     function ribbonPath(p, c, w0, w1) {
-        var dir = c.dir;
-        var s = (p.depth === 0) ? { x: p.cx + dir * (p.w / 2 - 4), y: p.cy } : anchorOut(p);
-        var e = anchorIn(c);
+        var dir = linkDir(p, c);
+        var s = (p.depth === 0) ? { x: p.cx + dir * (p.w / 2 - 4), y: p.cy } : anchorOut(p, dir);
+        var e = anchorIn(c, dir);
         var dx = Math.abs(e.x - s.x);
         var c1x = s.x + dir * Math.max(18, dx * 0.4);
         var c2x = e.x - dir * Math.max(12, dx * 0.3);
@@ -1982,8 +2105,12 @@
             text: (text != null) ? text : ((ref.parentId === state.centralId) ? '分支主題' : '子主題'),
             sortOrder: ref.sortOrder + 5,
             collapsed: false,
-            /* 第一層改走左右平衡（原本直接沿用 sideOf(ref)，導致連按 Enter 全部堆同一側） */
-            side: (ref.parentId === state.centralId) ? pickBalancedSide(state.centralId) : null,
+            /* 第一層改走左右平衡（原本直接沿用 sideOf(ref)，導致連按 Enter 全部堆同一側）。
+               ★ 排序模式例外：左右由使用者自己排，此時硬做平衡會把新節點丟到另一側，
+                 反而違反「跟著我排的走」，因此沿用參考節點的側邊。 */
+            side: (ref.parentId === state.centralId)
+                    ? (layoutMode() === 'manual' ? sideOf(ref) : pickBalancedSide(state.centralId))
+                    : null,
             color: null,
             type: 'topic', posX: null, posY: null, structure: null, props: null
         };
@@ -3976,16 +4103,26 @@
         }).catch(function (e) { toast('載入失敗：' + e.message, true); });
     }
 
-    function createNewMap() {
-        var title = window.prompt('新的心智圖名稱：', '未命名心智圖');
-        if (title == null) return Promise.resolve();
-        title = title.trim() || '未命名心智圖';
-        return api('createmap', { body: { title: title } }).then(function (res) {
-            if (res && res.ok) {
-                return refreshMapList().then(function () { return openMap(res.mapId); });
-            }
-            toast((res && res.error) || '建立失敗', true);
-        }).catch(function (e) { toast('建立失敗：' + e.message, true); });
+    /* title 省略時會跳提示輸入；folderId 省略時放進「作用中資料夾」，
+       沒有作用中資料夾才放最外層 —— 這就是「點了資料夾再按＋新增」會生效的地方。 */
+    function createNewMap(title, folderId) {
+        var target = (folderId === undefined) ? (state.activeFolderId || null) : folderId;
+        if (title == null) {
+            title = window.prompt('新的心智圖名稱：', '未命名心智圖');
+            if (title == null) return Promise.resolve();
+        }
+        title = String(title).trim() || '未命名心智圖';
+        return api('createmap', { body: { title: title, folderId: (target == null ? '' : target) } })
+            .then(function (res) {
+                if (res && res.ok) {
+                    if (target) {                    /* 展開目標資料夾，不然新圖會像沒建成功 */
+                        var s2 = readFolderOpenSet(); s2[target] = 1; writeFolderOpenSet(s2);
+                    }
+                    if (res.title && res.title !== title) toast('已建立「' + res.title + '」（原名稱重複）');
+                    return refreshMapList().then(function () { return openMap(res.mapId); });
+                }
+                toast((res && res.error) || '建立失敗', true);
+            }).catch(function (e) { toast('建立失敗：' + e.message, true); });
     }
 
     function renameMapById(mapId, oldTitle) {
@@ -4027,6 +4164,11 @@
         return api('listmaps').then(function (res) {
             var maps = (res && res.ok && res.maps) ? res.maps : [];
             var folders = (res && res.ok && res.folders) ? res.folders : [];
+            /* 記住目前這張圖在哪個資料夾：節點右鍵「另開一張心智圖」會用它當落點 */
+            state.mapFolderId = null;
+            for (var i = 0; i < maps.length; i++) {
+                if (maps[i].mapId === state.mapId) { state.mapFolderId = maps[i].folderId || null; break; }
+            }
             renderMapList(maps, folders);
             return { maps: maps, folders: folders };
         }).catch(function () { renderMapList([], []); return { maps: [], folders: [] }; });
@@ -4086,7 +4228,7 @@
             item.setAttribute('draggable', 'true');
             item.addEventListener('dragstart', function (ev) {
                 if (ev.dataTransfer) {
-                    ev.dataTransfer.setData('text/plain', String(m.mapId));
+                    ev.dataTransfer.setData('text/plain', 'map:' + String(m.mapId));
                     ev.dataTransfer.effectAllowed = 'move';
                 }
             });
@@ -4101,79 +4243,204 @@
             return item;
         }
 
-        /* 資料夾群組 */
-        for (var fi = 0; fi < folders.length; fi++) {
-            (function (f) {
-                var inFolder = maps.filter(function (m) { return m.folderId === f.folderId; });
-                var isOpen = !!openSet[f.folderId];
-                var row = document.createElement('div');
-                row.className = 'folder-row';
-                var tw = document.createElement('span');
-                tw.className = 'tw';
-                tw.textContent = isOpen ? '▾' : '▸';
-                var name = document.createElement('span');
-                name.textContent = '📁 ' + f.title;
-                var cnt = document.createElement('span');
-                cnt.className = 'cnt';
-                cnt.textContent = inFolder.length ? String(inFolder.length) : '';
-                row.appendChild(tw); row.appendChild(name); row.appendChild(cnt);
-                row.addEventListener('click', function () {
-                    var s2 = readFolderOpenSet();
-                    if (s2[f.folderId]) delete s2[f.folderId]; else s2[f.folderId] = 1;
-                    writeFolderOpenSet(s2);
-                    refreshMapList();
-                });
-                row.addEventListener('contextmenu', function (ev) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    showFolderMenu(ev.clientX, ev.clientY, f);
-                });
-                row.addEventListener('dragover', function (ev) {
-                    ev.preventDefault();
-                    if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
-                    row.classList.add('drop-target');
-                });
-                row.addEventListener('dragleave', function () { row.classList.remove('drop-target'); });
-                row.addEventListener('drop', function (ev) {
-                    ev.preventDefault();
-                    row.classList.remove('drop-target');
-                    var mid = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
-                    if (mid) moveMapToFolder(mid, f.folderId);
-                });
-                box.appendChild(row);
-                if (isOpen) {
-                    for (var mi = 0; mi < inFolder.length; mi++) box.appendChild(buildMapItem(inFolder[mi], true));
-                    if (!inFolder.length) {
-                        var em = document.createElement('div');
-                        em.className = 'drawer-sec';
-                        em.style.marginLeft = '24px';
-                        em.textContent = '（空資料夾）';
-                        box.appendChild(em);
-                    }
-                }
-            })(folders[fi]);
+        /* 資料夾樹：遞迴渲染，依深度縮排。
+           ★ 側欄原本是「平鋪一層資料夾」，改成巢狀後改走這裡；
+             拖曳同時支援「心智圖→資料夾」與「資料夾→資料夾」，靠 dataTransfer 的前綴區分。 */
+        var kids = {};
+        for (var ki = 0; ki < folders.length; ki++) {
+            var pk = folders[ki].parentId || '';
+            (kids[pk] || (kids[pk] = [])).push(folders[ki]);
         }
+
+        function folderDropHandlers(row, targetFolderId) {
+            row.addEventListener('dragover', function (ev) {
+                ev.preventDefault();
+                if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+                row.classList.add('drop-target');
+            });
+            row.addEventListener('dragleave', function () { row.classList.remove('drop-target'); });
+            row.addEventListener('drop', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                row.classList.remove('drop-target');
+                var raw = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
+                if (!raw) return;
+                if (raw.indexOf('folder:') === 0) moveFolderTo(raw.slice(7), targetFolderId);
+                else if (raw.indexOf('map:') === 0) moveMapToFolder(raw.slice(4), targetFolderId);
+                else moveMapToFolder(raw, targetFolderId);   /* 舊格式相容 */
+            });
+        }
+
+        function buildFolder(f, depth) {
+            var inFolder = maps.filter(function (m) { return m.folderId === f.folderId; });
+            var subs = kids[f.folderId] || [];
+            var isOpen = !!openSet[f.folderId];
+            var row = document.createElement('div');
+            row.className = 'folder-row' + (state.activeFolderId === f.folderId ? ' active' : '');
+            row.style.paddingLeft = (10 + depth * 14) + 'px';
+            var tw = document.createElement('span');
+            tw.className = 'tw';
+            tw.textContent = (inFolder.length || subs.length) ? (isOpen ? '▾' : '▸') : '·';
+            var name = document.createElement('span');
+            name.textContent = '📁 ' + f.title;
+            var cnt = document.createElement('span');
+            cnt.className = 'cnt';
+            cnt.textContent = inFolder.length ? String(inFolder.length) : '';
+            row.appendChild(tw); row.appendChild(name); row.appendChild(cnt);
+
+            /* 點一下＝展開／摺疊，同時設為「作用中資料夾」（＋新增會放進這裡）；
+               點目前已作用中的那一列＝取消作用中。 */
+            row.addEventListener('click', function () {
+                var wasActive = (state.activeFolderId === f.folderId);
+                var s2 = readFolderOpenSet();
+                if (s2[f.folderId]) delete s2[f.folderId]; else s2[f.folderId] = 1;
+                writeFolderOpenSet(s2);
+                setActiveFolder(wasActive ? null : f.folderId, true);
+            });
+            row.addEventListener('contextmenu', function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                showFolderMenu(ev.clientX, ev.clientY, f);
+            });
+            row.setAttribute('draggable', 'true');
+            row.addEventListener('dragstart', function (ev) {
+                ev.stopPropagation();
+                if (ev.dataTransfer) {
+                    ev.dataTransfer.setData('text/plain', 'folder:' + f.folderId);
+                    ev.dataTransfer.effectAllowed = 'move';
+                }
+            });
+            folderDropHandlers(row, f.folderId);
+            box.appendChild(row);
+
+            if (isOpen) {
+                for (var si = 0; si < subs.length; si++) buildFolder(subs[si], depth + 1);
+                for (var mi = 0; mi < inFolder.length; mi++) {
+                    var it = buildMapItem(inFolder[mi], true);
+                    it.style.paddingLeft = (14 + (depth + 1) * 14) + 'px';
+                    box.appendChild(it);
+                }
+                if (!inFolder.length && !subs.length) {
+                    var em = document.createElement('div');
+                    em.className = 'drawer-sec';
+                    em.style.marginLeft = (24 + depth * 14) + 'px';
+                    em.textContent = '（空資料夾）';
+                    box.appendChild(em);
+                }
+            }
+        }
+
+        var roots = kids[''] || [];
+        for (var ri = 0; ri < roots.length; ri++) buildFolder(roots[ri], 0);
 
         /* 未分類 */
         var loose = maps.filter(function (m) { return m.folderId == null; });
-        if (folders.length && loose.length) {
+        if (folders.length) {
             var sec = document.createElement('div');
-            sec.className = 'drawer-sec';
+            sec.className = 'drawer-sec' + (state.activeFolderId === null ? ' active' : '');
             sec.textContent = '未分類（拖到這裡＝移出資料夾）';
-            sec.addEventListener('dragover', function (ev) {
-                ev.preventDefault();
-                sec.classList.add('drop-target');
-            });
-            sec.addEventListener('dragleave', function () { sec.classList.remove('drop-target'); });
-            sec.addEventListener('drop', function (ev) {
-                ev.preventDefault();
-                sec.classList.remove('drop-target');
-                var mid = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
-                if (mid) moveMapToFolder(mid, null);
-            });
+            sec.addEventListener('click', function () { setActiveFolder(null, true); });
+            folderDropHandlers(sec, null);
             box.appendChild(sec);
         }
         for (var li = 0; li < loose.length; li++) box.appendChild(buildMapItem(loose[li], false));
+    }
+
+    /**
+     * 把某個節點連同整個子樹抽出來，組成一份可直接建圖的 doc。
+     * 該節點成為新圖的中心主題（type 改 central、parentId 清空、位置與 side 歸零），
+     * 子孫的父子關係原樣保留。原圖完全不動 —— 這是「複製出去」而不是「搬出去」。
+     *
+     * 一併帶走的東西：只保留「兩端都在子樹內」的關聯線、成員全在子樹內的外框，
+     * 以及父節點與涉及的子節點都在子樹內的概要。跨出子樹的那些帶不走，硬帶會產生斷掉的參照。
+     */
+    function buildSubtreeDoc(rootId) {
+        var root = node(rootId);
+        if (!root) return null;
+
+        var idx = buildChildIndex(true);          /* 含 callout / summary 節點 */
+        var keep = {}, order = [];
+        (function walk(id) {
+            var n = node(id);
+            if (!n || keep[id]) return;
+            keep[id] = 1; order.push(n);
+            var kids = idx[id] || [];
+            for (var i = 0; i < kids.length; i++) walk(kids[i].id);
+        })(rootId);
+
+        var nodes = order.map(function (n) {
+            var isRoot = (n.id === rootId);
+            return {
+                id: n.id,
+                parentId: isRoot ? null : (n.parentId || null),
+                text: n.text || '',
+                sortOrder: isRoot ? 0 : (n.sortOrder | 0),
+                collapsed: isRoot ? false : !!n.collapsed,
+                /* 中心主題底下的第一層才有 side；原本的 side 是相對舊中心算的，直接沿用會左右錯亂 */
+                side: (!isRoot && n.parentId === rootId && n.type === 'topic') ? sideOf(n) : null,
+                color: n.color || null,
+                type: isRoot ? 'central' : (n.type || 'topic'),
+                posX: null, posY: null,           /* 位置交給新圖重新排版 */
+                structure: isRoot ? (state.mapStructure || 'mindmap') : (n.structure || null),
+                props: propsToStr(n.props)
+            };
+        });
+
+        var relations = state.relations.filter(function (r) { return keep[r.fromId] && keep[r.toId]; })
+            .map(function (r) { return { relId: r.relId, fromId: r.fromId, toId: r.toId, label: r.label || null, props: r.props || null }; });
+
+        var boundaries = [];
+        for (var bi = 0; bi < state.boundaries.length; bi++) {
+            var b = state.boundaries[bi];
+            var mem = normalizeMembers(b).filter(function (id) { return keep[id]; });
+            if (mem.length && mem.length === normalizeMembers(b).length)
+                boundaries.push({ boundaryId: b.boundaryId, memberIds: mem, label: b.label || null, props: b.props || null });
+        }
+
+        var summaries = state.summaries.filter(function (sm) {
+            return keep[sm.parentId] && keep[sm.fromChildId] && keep[sm.toChildId] && keep[sm.topicId];
+        }).map(function (sm) {
+            return { summaryId: sm.summaryId, parentId: sm.parentId, fromChildId: sm.fromChildId,
+                     toChildId: sm.toChildId, topicId: sm.topicId };
+        });
+
+        return {
+            title: root.text || '未命名心智圖',
+            structure: state.mapStructure || 'mindmap',
+            theme: state.mapTheme || 'classic',
+            props: null,                          /* 排版模式不繼承：新圖從自動排列開始 */
+            nodes: nodes, relations: relations, boundaries: boundaries, summaries: summaries
+        };
+    }
+
+    /* 以某個節點為中心另開一張心智圖。新圖預設放在「目前這張圖所在的資料夾」——
+       拆出去的圖通常跟原圖是一組的，比丟進作用中資料夾直覺。 */
+    function extractSubtreeToMap(rootId) {
+        var root = node(rootId);
+        if (!root) return Promise.resolve();
+        if (root.type === 'callout' || root.type === 'summary') {
+            toast('標註與概要主題無法另開心智圖', true); return Promise.resolve();
+        }
+        var doc = buildSubtreeDoc(rootId);
+        if (!doc || !doc.nodes.length) { toast('沒有可以建立的內容', true); return Promise.resolve(); }
+
+        var def = (root.text || '').trim() || '未命名心智圖';
+        var title = window.prompt('新心智圖名稱：\n（會帶走「' + def + '」底下共 ' + doc.nodes.length + ' 個節點）', def);
+        if (title == null) return Promise.resolve();
+        doc.title = String(title).trim() || def;
+
+        var body = { title: doc.title, doc: doc, srcMapId: state.mapId || '',
+                     folderId: (state.mapFolderId == null ? '' : state.mapFolderId) };
+        toast('建立中…');
+        return api('createmapfromdoc', { body: body }).then(function (res) {
+            if (!res || !res.ok) throw new Error((res && res.error) || '建立失敗');
+            if (state.mapFolderId) {
+                var s2 = readFolderOpenSet(); s2[state.mapFolderId] = 1; writeFolderOpenSet(s2);
+            }
+            toast('已建立「' + res.title + '」'
+                  + (res.copiedFiles ? '（含 ' + res.copiedFiles + ' 個檔案）' : ''));
+            return refreshMapList();
+        }).catch(function (e) { toast('建立失敗：' + e.message, true); });
     }
 
     /* ---------------- P10：另存新檔＋資料夾 ---------------- */
@@ -4240,27 +4507,68 @@
 
     function showFolderMenu(x, y, f) {
         var mb = drawerMenuBase(x, y);
+        mb.item('在此資料夾新增心智圖…', function () {
+            var t = window.prompt('新心智圖名稱：', '未命名心智圖');
+            if (t == null) return;
+            createNewMap(t.trim() || '未命名心智圖', f.folderId);
+        });
+        mb.item('在此新增子資料夾…', function () {
+            var t = window.prompt('子資料夾名稱：', '新資料夾');
+            if (t == null) return;
+            createFolderNamed(t.trim() || '新資料夾', f.folderId)
+                .catch(function (e) { toast(e.message, true); });
+        });
+        mb.item('設為作用中資料夾', function () { setActiveFolder(f.folderId, true); });
         mb.item('重新命名資料夾…', function () {
             var t = window.prompt('資料夾名稱：', f.title);
             if (t == null) return;
             renameFolderNamed(f.folderId, t.trim() || f.title);
         });
+        if (f.parentId) mb.item('移出到最上層', function () { moveFolderTo(f.folderId, null); });
         mb.item('刪除資料夾', function () { deleteFolderById(f.folderId, f.title); }, true);
         mb.show();
     }
 
-    function createFolderNamed(title) {
-        return api('createfolder', { body: { title: title } }).then(function (res) {
-            if (!res || !res.ok) throw new Error((res && res.error) || '建立資料夾失敗');
-            refreshMapList();
-            return res;
-        });
+    /* 作用中資料夾：「＋新增」與各種建立動作的預設落點。存在 state，不進 localStorage
+       —— 它是當下的操作焦點，跨工作階段記住反而容易讓人把圖建錯地方。 */
+    function setActiveFolder(folderId, rerender) {
+        state.activeFolderId = (folderId == null) ? null : String(folderId);
+        if (rerender) refreshMapList();
+        return state.activeFolderId;
+    }
+
+    function moveFolderTo(folderId, parentId) {
+        if (folderId === parentId) return Promise.resolve();
+        return api('movefolder', { body: { folderId: folderId, parentId: (parentId == null ? '' : parentId) } })
+            .then(function (res) {
+                if (!res || !res.ok) throw new Error((res && res.error) || '搬移資料夾失敗');
+                if (parentId) {                     /* 搬進去之後自動展開，否則會像消失了 */
+                    var s2 = readFolderOpenSet(); s2[parentId] = 1; writeFolderOpenSet(s2);
+                }
+                return refreshMapList();
+            }).catch(function (e) { toast(e.message, true); });
+    }
+
+    function createFolderNamed(title, parentId) {
+        return api('createfolder', { body: { title: title, parentId: (parentId == null ? '' : parentId) } })
+            .then(function (res) {
+                if (!res || !res.ok) throw new Error((res && res.error) || '建立資料夾失敗');
+                var s2 = readFolderOpenSet();
+                if (parentId) s2[parentId] = 1;     /* 展開上層，新資料夾才看得到 */
+                if (res.folderId) s2[res.folderId] = 1;
+                writeFolderOpenSet(s2);
+                if (res.title && res.title !== title) toast('已建立「' + res.title + '」（原名稱重複）');
+                refreshMapList();
+                return res;
+            });
     }
 
     function createFolderPrompt() {
-        var t = window.prompt('新資料夾名稱：', '新資料夾');
+        /* 「＋資料夾」建在作用中資料夾底下；沒有作用中資料夾就建在最上層 */
+        var parentId = state.activeFolderId || null;
+        var t = window.prompt(parentId ? '子資料夾名稱：' : '新資料夾名稱：', '新資料夾');
         if (t == null) return;
-        createFolderNamed(t.trim() || '新資料夾').catch(function (e) { toast(e.message, true); });
+        createFolderNamed(t.trim() || '新資料夾', parentId).catch(function (e) { toast(e.message, true); });
     }
 
     function renameFolderNamed(folderId, title) {
@@ -4270,10 +4578,41 @@
         }).catch(function (e) { toast(e.message, true); });
     }
 
+    /**
+     * 刪除資料夾 —— 連同底下的子資料夾與心智圖一起刪除，Drive 上的檔案也會清掉。
+     * ★ 這跟舊版行為不同（舊版只把圖移到未分類），資料真的會不見且無法復原，
+     *   所以非空的資料夾要走兩段確認：先說明底下有什麼，再要求打字輸入資料夾名稱。
+     */
     function deleteFolderById(folderId, title) {
-        if (!window.confirm('刪除資料夾「' + (title || '') + '」？（裡面的心智圖會移到未分類）')) return Promise.resolve();
-        return api('deletefolder', { body: { folderId: folderId } }).then(function (res) {
+        var name = title || '';
+        return api('folderstats', { qs: { folderId: folderId } }).then(function (st) {
+            var nMaps = (st && st.ok) ? (st.maps || 0) : 0;
+            var nSubs = (st && st.ok) ? (st.folders || 0) : 0;
+
+            if (!nMaps && !nSubs) {
+                if (!window.confirm('刪除空資料夾「' + name + '」？')) return null;
+                return api('deletefolder', { body: { folderId: folderId, confirm: true } });
+            }
+
+            var what = [];
+            if (nMaps) what.push(nMaps + ' 張心智圖');
+            if (nSubs) what.push(nSubs + ' 個子資料夾');
+            if (!window.confirm(
+                '資料夾「' + name + '」底下還有 ' + what.join('、') + '。\n\n' +
+                '刪除後，這些心智圖連同裡面的圖片與附檔都會一併刪除，無法復原。\n\n' +
+                '確定要繼續嗎？')) return null;
+
+            var typed = window.prompt('這個動作無法復原。\n請輸入資料夾名稱「' + name + '」以確認刪除：', '');
+            if (typed == null) return null;
+            if (typed.trim() !== name) { toast('名稱不符，已取消刪除', true); return null; }
+
+            return api('deletefolder', { body: { folderId: folderId, confirm: true } });
+        }).then(function (res) {
+            if (res === null) return null;
             if (!res || !res.ok) throw new Error((res && res.error) || '刪除失敗');
+            if (state.activeFolderId === folderId) state.activeFolderId = null;
+            toast('已刪除「' + name + '」'
+                  + (res.deletedMaps ? '（含 ' + res.deletedMaps + ' 張心智圖）' : ''));
             return refreshMapList();
         }).catch(function (e) { toast(e.message, true); });
     }
@@ -4550,6 +4889,9 @@
             if (nid) startEdit(nid, null, true);
         });
         item('整理浮動主題', function () { tidyFloating(); });
+        item(layoutMode() === 'manual' ? '排版模式：切回自動排列' : '排版模式：改為依我的排列',
+             function () { toggleLayoutMode(); });
+        if (layoutMode() === 'manual') item('依目前位置排列', function () { arrangeByPosition(); });
         item('恢復全部自動排列', function () { clearAllPins(); });
         item('AI 生成心智圖…', function () { openAiMapModal(); });
         menu.classList.remove('hidden');
@@ -4920,8 +5262,14 @@
         if (n.type === 'topic' && n.parentId) {
             if (isPinned(n)) {
                 item('取消固定位置（回自動排列）', '', function () { clearNodePos(id); });
+                if (layoutMode() === 'manual') {
+                    item('依目前位置排列', '', function () { arrangeByPosition(); });
+                }
             }
             item('拆離成浮動主題', '', function () { detachToFloating(id, n.cx, n.cy); });
+        }
+        if (n.type === 'topic' || n.type === 'floating') {
+            item('以此主題另開一張心智圖…', '', function () { extractSubtreeToMap(id); });
         }
 
         if (id !== state.centralId) {
@@ -5767,6 +6115,33 @@
             els.stNodes.textContent = '節點 ' + cnt;
         }
         if (els.stZoom) els.stZoom.textContent = Math.round(state.scale * 100) + '%';
+        updateLayoutModeUI();
+    }
+
+    /* 排版模式的按鈕外觀：模式鈕換圖示＋亮起（沿用既有 .primary，三個佈景主題都已定義過樣式）。
+       ★ 不用 disabled：工具列氣泡是 document 層的 mouseover 委派，而 disabled 的按鈕在 Chrome
+         不會觸發滑鼠事件 —— 那會讓「為什麼不能按」的提示剛好看不到。改成淡化但可點，
+         點下去由各自的處理函式給明確理由。 */
+    function updateLayoutModeUI() {
+        var manual = (layoutMode() === 'manual');
+        if (els.btnLayoutMode) {
+            els.btnLayoutMode.classList.toggle('primary', manual);
+            els.btnLayoutMode.setAttribute('data-tip', manual ? '排版模式：依我的排列（點一下切回自動）'
+                                                             : '排版模式：自動排列（點一下改成依我的排列）');
+        }
+        if (els.icoLayoutMode) {
+            els.icoLayoutMode.setAttribute('href', manual ? '#i-handlayout' : '#i-autolayout');
+        }
+        if (els.btnArrange) {
+            els.btnArrange.classList.toggle('off', !manual);
+            els.btnArrange.setAttribute('data-tip', manual ? '依目前位置排列（把拖曳的位置換算成順序並吸附）'
+                                                           : '依目前位置排列（需先切換到「依我的排列」模式）');
+        }
+        if (els.btnRebalance) {
+            els.btnRebalance.classList.toggle('off', manual);
+            els.btnRebalance.setAttribute('data-tip', manual ? '重新平衡左右分支（「依我的排列」模式下停用）'
+                                                             : '重新平衡左右分支');
+        }
     }
 
     /* 固定式側欄：使用者手動開合，狀態記在 localStorage */
@@ -5867,6 +6242,9 @@
         els.btnExportSvg = $('btnExportSvg');
         els.btnCopyImg = $('btnCopyImg');
         els.btnRebalance = $('btnRebalance');
+        els.btnLayoutMode = $('btnLayoutMode');
+        els.btnArrange = $('btnArrange');
+        els.icoLayoutMode = $('icoLayoutMode');
         els.aiModal = $('aiModal');
         els.aiTitle = $('aiTitle');
         els.aiCountRow = $('aiCountRow');
@@ -6007,6 +6385,8 @@
         bindStylePanel();
         if (els.btnCopyImg) els.btnCopyImg.addEventListener('click', function () { copyMapImage(); });
         if (els.btnRebalance) els.btnRebalance.addEventListener('click', function () { rebalanceSides(); });
+        if (els.btnLayoutMode) els.btnLayoutMode.addEventListener('click', function () { toggleLayoutMode(); });
+        if (els.btnArrange) els.btnArrange.addEventListener('click', function () { arrangeByPosition(); });
         $('btnExport').addEventListener('click', exportPNG);
         if (els.btnExportSvg) els.btnExportSvg.addEventListener('click', exportSVG);
         $('btnDrawer').addEventListener('click', function () {
@@ -6015,7 +6395,8 @@
         try {
             if (localStorage.getItem('mm.drawerOpen') === '0') els.drawer.classList.add('closed');
         } catch (e) { }
-        $('btnNewMap').addEventListener('click', createNewMap);
+        /* 包一層：直接綁 createNewMap 會把 click 事件物件當成 title 參數傳進去 */
+        $('btnNewMap').addEventListener('click', function () { createNewMap(); });
         if ($('btnNewFolder')) $('btnNewFolder').addEventListener('click', createFolderPrompt);
         if (els.btnAddSheet) els.btnAddSheet.addEventListener('click', function () { addSheet(); });
         $('btnHelp').addEventListener('click', function () { $('helpModal').classList.remove('hidden'); });
@@ -6176,8 +6557,14 @@
         clearAllPins: clearAllPins,
         saveMapAsById: saveMapAsById,
         moveMapToFolder: moveMapToFolder,
+        renameFolderNamed: renameFolderNamed,
         createFolderNamed: createFolderNamed,
         deleteFolderById: deleteFolderById,
+        setActiveFolder: setActiveFolder,
+        moveFolderTo: moveFolderTo,
+        createNewMap: createNewMap,
+        buildSubtreeDoc: buildSubtreeDoc,
+        extractSubtreeToMap: extractSubtreeToMap,
         refreshMapList: refreshMapList,
         openDrawer: openDrawer,
         closeDrawer: closeDrawer,
@@ -6200,6 +6587,10 @@
         addBoundary: addBoundary,
         copyMapImage: copyMapImage,
         rebalanceSides: rebalanceSides,
+        layoutMode: layoutMode,
+        setLayoutMode: setLayoutMode,
+        toggleLayoutMode: toggleLayoutMode,
+        arrangeByPosition: arrangeByPosition,
         pickBalancedSide: pickBalancedSide,
         boundaryClusters: boundaryClusters,
         normalizeMembers: normalizeMembers,
