@@ -5439,6 +5439,11 @@
         if (id !== state.centralId) {
             item('新增同層主題', 'Enter', function () { var nid = addSibling(id); if (nid) startEdit(nid, null, true); });
             item('在上方新增同層', 'Ctrl+Enter', function () { var nu = addSibling(id, null, true); if (nu) startEdit(nu, null, true); });
+            var horizMv = siblingAxisIsHorizontal(n);
+            item(horizMv ? '往前移一位' : '上移一位', horizMv ? 'Ctrl+←' : 'Ctrl+↑',
+                 function () { moveSibling(id, -1); });
+            item(horizMv ? '往後移一位' : '下移一位', horizMv ? 'Ctrl+→' : 'Ctrl+↓',
+                 function () { moveSibling(id, 1); });
         }
         item('新增標註', '', function () { var cid = addCallout(id); if (cid) startEdit(cid, null, true); });
         item('建立關聯 →', '', function () { startLinking(id); });
@@ -6091,6 +6096,64 @@
         else toParent();
     }
 
+    /* ---------------- 同層排序：Ctrl＋方向鍵 ----------------
+       ★ 用哪一組方向鍵，跟著該結構的「同層導航鍵」走（見 navigate()）：
+         組織圖的子節點是橫向排列，同層前後是 ←→；其餘結構是縱向堆疊，同層前後是 ↑↓。
+         這樣「移動」與「導航」的方向語意永遠一致，不必另外記一套。 */
+    function siblingAxisIsHorizontal(n) {
+        var p = n && n.parentId ? node(n.parentId) : null;
+        if (!p) return false;
+        return structureOf(p) === 'org-down';
+    }
+
+    /* delta = -1 往前（上／左）、+1 往後（下／右）。回傳是否真的移動了。 */
+    function moveSibling(id, delta) {
+        var n = node(id);
+        if (!n || !n.parentId) return false;
+        if (n.type === 'callout' || n.type === 'summary') return false;
+
+        var sibs = buildChildIndex()[n.parentId] || [];
+        var p = node(n.parentId);
+        /* 心智圖第一層分左右兩側，各側獨立排序 —— 與 ↑↓ 導航一致；換邊請用拖曳 */
+        if (n.parentId === state.centralId && p && structureOf(p) === 'mindmap') {
+            sibs = sibs.filter(function (x) { return sideOf(x) === sideOf(n); });
+        }
+        var i = -1;
+        for (var j = 0; j < sibs.length; j++) if (sibs[j].id === id) { i = j; break; }
+        if (i < 0) return false;
+        var k = i + delta;
+        if (k < 0 || k >= sibs.length) return false;      /* 到頭就停住，不繞回另一端 */
+
+        pushUndo();
+        var a = sibs[i], b = sibs[k], tmp = a.sortOrder;
+        a.sortOrder = b.sortOrder;
+        b.sortOrder = tmp;
+        /* 兩者原本同分時交換無效，補一次正規化把序號重新拉開 */
+        if (a.sortOrder === b.sortOrder) {
+            normalizeOrders(n.parentId);
+            a.sortOrder = a.sortOrder + (delta < 0 ? -15 : 15);
+        }
+        normalizeOrders(n.parentId);
+        afterMutate();
+        ensureVisible(node(id));
+        return true;
+    }
+
+    /* 把 Ctrl＋方向鍵翻譯成同層前後移動；不是該結構的同層軸就不接手 */
+    function moveSiblingByKey(id, key) {
+        var n = node(id);
+        if (!n) return false;
+        var horiz = siblingAxisIsHorizontal(n);
+        if (horiz) {
+            if (key === 'ArrowLeft') return moveSibling(id, -1);
+            if (key === 'ArrowRight') return moveSibling(id, 1);
+        } else {
+            if (key === 'ArrowUp') return moveSibling(id, -1);
+            if (key === 'ArrowDown') return moveSibling(id, 1);
+        }
+        return false;
+    }
+
     function onKeyDown(e) {
         var key = e.key;
 
@@ -6161,6 +6224,21 @@
             if (key === 'Enter') {
                 e.preventDefault();
                 if (state.selectedId) { var upN = addSibling(state.selectedId, null, true); if (upN) startEdit(upN, null, true); }
+                return;
+            }
+            if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {
+                e.preventDefault();
+                if (state.selectedId) {
+                    if (!moveSiblingByKey(state.selectedId, key)) {
+                        var nMv = node(state.selectedId);
+                        /* 到頂／到底，或按到不是這個結構的同層軸 —— 出個聲提示，不要靜默 */
+                        if (nMv && !nMv.parentId) toast('中心主題無法移動', true);
+                        else if (nMv && siblingAxisIsHorizontal(nMv) &&
+                                 (key === 'ArrowUp' || key === 'ArrowDown')) {
+                            toast('組織圖的同層主題是左右排列，請用 Ctrl+← / Ctrl+→', true);
+                        }
+                    }
+                }
                 return;
             }
             if (lk === 'c') { e.preventDefault(); copySelectionToClipboard(); return; }
@@ -6786,6 +6864,9 @@
         buildChildIndex: buildChildIndex,
         addChild: addChild,
         addSibling: addSibling,
+        moveSibling: moveSibling,
+        moveSiblingByKey: moveSiblingByKey,
+        siblingAxisIsHorizontal: siblingAxisIsHorizontal,
         removeNode: removeNode,
         setText: setText,
         toggleCollapse: toggleCollapse,
@@ -6842,6 +6923,9 @@
         addBoundary: addBoundary,
         copyMapImage: copyMapImage,
         addSibling: addSibling,
+        moveSibling: moveSibling,
+        moveSiblingByKey: moveSiblingByKey,
+        siblingAxisIsHorizontal: siblingAxisIsHorizontal,
         copySelectionToClipboard: copySelectionToClipboard,
         pasteNodesPayload: pasteNodesPayload,
         serializeNodesForClipboard: serializeNodesForClipboard,
