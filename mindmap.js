@@ -6439,9 +6439,20 @@
         return refreshMapList().then(function (r) {
             /* refreshMapList 回傳 { maps, folders }；相容直接回陣列的情況 */
             var maps = Array.isArray(r) ? r : ((r && r.maps) ? r.maps : []);
+            /* 後端目錄若有問題，可能回傳一批 mapId 是空的資料。這種列先濾掉，
+               否則會拿空字串去打 loadmap，只換來一句「缺少必要參數：mapId」，看不出真正的原因。 */
+            var bad = 0;
+            maps = maps.filter(function (m) {
+                if (m && m.mapId !== null && m.mapId !== undefined && String(m.mapId) !== '') return true;
+                bad++; return false;
+            });
+            if (bad) {
+                toast('後端有 ' + bad + ' 筆資料的 mapId 是空的，請在 Apps Script 執行 diagnose 檢查 Maps 工作表', true);
+            }
             if (!maps.length) {
+                if (bad) return;      /* 目錄有問題時不要再自動建圖，先讓人把後端修好 */
                 return api('createmap', { body: { title: '未命名心智圖' } }).then(function (res) {
-                    if (res && res.ok) return openMap(res.mapId);
+                    if (res && res.ok && res.mapId) return openMap(res.mapId);
                     toast((res && res.error) || '初始化失敗', true);
                 });
             }
