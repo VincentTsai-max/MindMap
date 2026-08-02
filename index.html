@@ -256,6 +256,9 @@
     .mm-modal{ position:fixed; inset:0; background:rgba(20,24,32,.45); display:flex; align-items:center; justify-content:center; z-index:60; }
     .mm-modal.hidden{ display:none; }
     .mm-modal .box{ background:#fff; border-radius:12px; padding:18px 20px; width:340px; box-shadow:0 12px 40px rgba(0,0,0,.25); font-size:14px; color:#333A45; }
+    /* 備註視窗尺寸放大一倍。用 min()／dvh 夾住，視窗窄或矮的時候才不會被切掉。 */
+    #noteModal .box{ width:min(680px, 92vw); }
+    #noteModal textarea{ height:min(240px, 50dvh); }
     .mm-modal .box h3{ margin:0 0 12px; font-size:15px; }
     .mm-modal .box .row{ margin:8px 0; display:flex; gap:8px; align-items:center; }
     .mm-modal .box input[type=text], .mm-modal .box textarea{ flex:1; min-width:0; border:1px solid var(--line); border-radius:8px; padding:7px 9px; font:inherit; }
@@ -823,6 +826,9 @@
                 <tr><td>拖曳節點到空白處</td><td>固定在該位置（連線不斷、兄弟自動重排）；右鍵可取消固定或拆離成浮動主題</td></tr>
                 <tr><td>雙擊畫布空白處</td><td>建立新的浮動主題</td></tr>
                 <tr><td>右鍵畫布空白處</td><td>新增浮動主題／整理浮動主題／切換排版模式／依目前位置排列／AI 生成心智圖…</td></tr>
+                <tr><td>Ctrl+Enter</td><td>在目前主題的<b>上方</b>插入同層主題（Enter 是在下方新增）</td></tr>
+                <tr><td>Ctrl+C／Ctrl+X／Ctrl+V</td><td>複製／剪下／貼上主題，連同子樹、圖片、附檔、備註一起帶走。可跨心智圖貼上</td></tr>
+                <tr><td>F4</td><td>為目前主題開啟備註視窗</td></tr>
                 <tr><td>右鍵節點</td><td>除了編輯與結構外，可「以此主題另開一張心智圖」——連同整個子樹（含圖片與附檔）複製成新圖，原圖不動</td></tr>
             </table>
 
@@ -882,7 +888,7 @@
         </div>
     </div>
 
-    <script src="mindmap.js?v=static11" charset="utf-8"></script>
+    <script src="mindmap.js?v=static12" charset="utf-8"></script>
     <div id="tbTip"></div>
 </body>
 </html>

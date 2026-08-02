@@ -160,6 +160,7 @@
         mapFolderId: null,    // 目前這張圖所在的資料夾（節點抽出子樹時的落點）
         selectedId: null,
         selectedIds: [],      // 多選（P4 起有 UI；恆包含 selectedId）
+        clipboard: null,      // 節點複製的內部剪貼簿（Clipboard API 不可用時的備援）
         selectedRelId: null,  // 選取中的關聯線（與節點選取互斥）
         selectedBoundaryId: null, // 選取中的外框（P4）
         linking: null,        // 連線模式 {fromId}（P3）
@@ -2093,7 +2094,8 @@
         return id;
     }
 
-    function addSibling(id, text) {
+    /* above=true 時插在參考節點的「上方」（Ctrl+Enter），否則接在下方（Enter） */
+    function addSibling(id, text, above) {
         if (!node(id)) return null;
         if (node(id).type === 'callout' || node(id).type === 'summary') return null;
         if (id === state.centralId) return addChild(id, text);
@@ -2103,13 +2105,15 @@
         var n = {
             id: nid, parentId: ref.parentId,
             text: (text != null) ? text : ((ref.parentId === state.centralId) ? '分支主題' : '子主題'),
-            sortOrder: ref.sortOrder + 5,
+            sortOrder: ref.sortOrder + (above ? -5 : 5),
             collapsed: false,
             /* 第一層改走左右平衡（原本直接沿用 sideOf(ref)，導致連按 Enter 全部堆同一側）。
                ★ 排序模式例外：左右由使用者自己排，此時硬做平衡會把新節點丟到另一側，
                  反而違反「跟著我排的走」，因此沿用參考節點的側邊。 */
+            /* 往上插入是「就放在這個節點上面」的明確指令，此時做左右平衡會把它丟到另一側，
+               看起來就不在上面了，所以 above 時一律沿用參考節點的側邊。 */
             side: (ref.parentId === state.centralId)
-                    ? (layoutMode() === 'manual' ? sideOf(ref) : pickBalancedSide(state.centralId))
+                    ? ((above || layoutMode() === 'manual') ? sideOf(ref) : pickBalancedSide(state.centralId))
                     : null,
             color: null,
             type: 'topic', posX: null, posY: null, structure: null, props: null
@@ -3514,13 +3518,207 @@
         inputEl.click();
     }
 
+    /* ---------------- 節點複製／貼上（含子樹、圖片、附檔、備註） ----------------
+       設計重點：Ctrl+C 除了存進內部剪貼簿，還會把同一份 JSON 寫進「系統剪貼簿」。
+       這樣做的關鍵理由是 —— 系統剪貼簿裡若殘留著先前複製的圖片，Ctrl+V 會優先貼出那張圖，
+       使用者就會覺得「複製節點沒有用」。寫入文字等於把舊圖片頂掉，兩個功能才不會打架。
+       附帶好處：可以跨心智圖、跨分頁貼上。 */
+    var MM_CLIP_TAG = 'mindmap-nodes-v1';
+
+    /* 把一組節點連同子樹序列化。roots 只保留「祖先不在選取範圍內」的節點，
+       否則父子都被選到時會複製兩份。 */
+    function serializeNodesForClipboard(ids) {
+        var sel = {}, i;
+        for (i = 0; i < ids.length; i++) {
+            var nn = node(ids[i]);
+            if (nn && nn.type !== 'callout' && nn.type !== 'summary') sel[ids[i]] = 1;
+        }
+        var roots = [];
+        for (var id in sel) {
+            var cur = node(id), isNested = false;
+            while (cur && cur.parentId) {
+                if (sel[cur.parentId]) { isNested = true; break; }
+                cur = node(cur.parentId);
+            }
+            if (!isNested) roots.push(id);
+        }
+        if (!roots.length) return null;
+        roots.sort(function (a, b) { return (node(a).sortOrder | 0) - (node(b).sortOrder | 0); });
+
+        var idx = buildChildIndex(true), out = [], fileIds = {};
+        function take(id, parentId, isRoot) {
+            var n = node(id);
+            if (!n) return;
+            var pr = n.props ? JSON.parse(JSON.stringify(n.props)) : null;
+            if (pr) {
+                if (pr.image && pr.image.fileId) fileIds[String(pr.image.fileId)] = 1;
+                if (Array.isArray(pr.attachments)) pr.attachments.forEach(function (a) {
+                    if (a && a.fileId) fileIds[String(a.fileId)] = 1;
+                });
+                /* 連到本圖其他主題的超連結，跨圖貼上會指向不存在的節點 —— 貼上時再判斷 */
+            }
+            out.push({
+                id: id, parentId: isRoot ? null : parentId,
+                text: n.text || '', sortOrder: n.sortOrder | 0,
+                collapsed: !!n.collapsed, color: n.color || null,
+                type: (n.type === 'floating') ? 'topic' : (n.type || 'topic'),
+                structure: n.structure || null, props: pr
+            });
+            var kids = idx[id] || [];
+            for (var k = 0; k < kids.length; k++) take(kids[k].id, id, false);
+        }
+        for (i = 0; i < roots.length; i++) take(roots[i], null, true);
+
+        return {
+            tag: MM_CLIP_TAG, srcMapId: state.mapId || '',
+            roots: roots.slice(), nodes: out, fileIds: Object.keys(fileIds)
+        };
+    }
+
+    function copySelectionToClipboard(cut) {
+        var ids = (state.selectedIds && state.selectedIds.length)
+                    ? state.selectedIds.slice()
+                    : (state.selectedId ? [state.selectedId] : []);
+        if (!ids.length) return Promise.resolve();
+        if (ids.length === 1 && ids[0] === state.centralId) {
+            toast('中心主題無法複製', true); return Promise.resolve();
+        }
+        var payload = serializeNodesForClipboard(ids);
+        if (!payload) { toast('沒有可複製的節點', true); return Promise.resolve(); }
+
+        state.clipboard = payload;                       /* 內部備援，clipboard API 失敗時仍可貼 */
+        var text = JSON.stringify(payload);
+        var done = function () {
+            var n = payload.nodes.length;
+            toast((cut ? '已剪下 ' : '已複製 ') + payload.roots.length + ' 個主題（共 ' + n + ' 個節點）');
+            if (cut) {
+                var del = payload.roots.filter(function (id) { return id !== state.centralId; });
+                if (del.length) removeNodes(del);
+            }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text).then(done).catch(function () { done(); });
+        }
+        done();
+        return Promise.resolve();
+    }
+
+    /* 貼上一份 payload：重新配 id、掛到 targetId 底下，必要時先請後端複製檔案 */
+    function pasteNodesPayload(payload, targetId) {
+        var target = node(targetId);
+        if (!payload || !payload.nodes || !payload.nodes.length || !target) return Promise.resolve();
+        if (target.type === 'callout' || target.type === 'summary') {
+            toast('標註與概要主題底下無法貼上', true); return Promise.resolve();
+        }
+
+        var sameMap = (String(payload.srcMapId || '') === String(state.mapId || ''));
+        var needFiles = (!sameMap && payload.fileIds && payload.fileIds.length);
+
+        var pre = needFiles
+            ? api('copyfiles', { body: { srcMapId: payload.srcMapId, dstMapId: state.mapId,
+                                         fileIds: payload.fileIds } })
+                .then(function (res) { return (res && res.ok && res.map) ? res.map : {}; })
+                .catch(function () { return {}; })
+            : Promise.resolve(null);
+
+        return pre.then(function (fileMap) {
+            pushUndo();
+            var idMap = {}, i;
+            for (i = 0; i < payload.nodes.length; i++) idMap[payload.nodes[i].id] = uid();
+
+            var base = 0;
+            var sibs = buildChildIndex()[targetId] || [];
+            for (i = 0; i < sibs.length; i++) base = Math.max(base, sibs[i].sortOrder | 0);
+
+            var dropped = 0;
+            for (i = 0; i < payload.nodes.length; i++) {
+                var src = payload.nodes[i];
+                var isRoot = (src.parentId === null);
+                var pr = src.props ? JSON.parse(JSON.stringify(src.props)) : null;
+
+                if (pr && fileMap) {
+                    /* 跨圖：把 fileId 換成後端複製出來的新 id；複製失敗的就拿掉，
+                       留著會指向別張圖的檔案，來源圖一刪就變空白。 */
+                    if (pr.image && pr.image.fileId) {
+                        if (fileMap[pr.image.fileId]) pr.image.fileId = fileMap[pr.image.fileId];
+                        else { delete pr.image; dropped++; }
+                    }
+                    if (Array.isArray(pr.attachments)) {
+                        pr.attachments = pr.attachments.filter(function (a) {
+                            if (!a || !a.fileId) return true;
+                            if (fileMap[a.fileId]) { a.fileId = fileMap[a.fileId]; return true; }
+                            dropped++; return false;
+                        });
+                        if (!pr.attachments.length) delete pr.attachments;
+                    }
+                }
+                /* 「連到本圖主題」的超連結：跨圖會指向不存在的節點；同圖內若對象也被複製則改指新節點 */
+                if (pr && pr.link && pr.link.topicId) {
+                    if (idMap[pr.link.topicId]) pr.link.topicId = idMap[pr.link.topicId];
+                    else if (!sameMap || !node(pr.link.topicId)) delete pr.link;
+                }
+
+                state.nodes[idMap[src.id]] = {
+                    id: idMap[src.id],
+                    parentId: isRoot ? targetId : idMap[src.parentId],
+                    text: src.text || '',
+                    sortOrder: isRoot ? (base += 10) : (src.sortOrder | 0),
+                    collapsed: !!src.collapsed,
+                    side: (isRoot && targetId === state.centralId)
+                            ? (layoutMode() === 'manual' ? 'R' : pickBalancedSide(state.centralId)) : null,
+                    color: src.color || null,
+                    type: src.type || 'topic',
+                    posX: null, posY: null,
+                    structure: src.structure || null,
+                    props: pr
+                };
+            }
+            normalizeOrders(targetId);
+            if (target.collapsed) target.collapsed = false;   /* 貼進摺疊的分支會看不到 */
+            afterMutate();
+
+            var rootIds = [];
+            for (i = 0; i < payload.nodes.length; i++) {
+                if (payload.nodes[i].parentId === null) rootIds.push(idMap[payload.nodes[i].id]);
+            }
+            state.selectedIds = rootIds.slice();
+            if (rootIds.length) select(rootIds[0]);
+
+            toast('已貼上 ' + rootIds.length + ' 個主題'
+                  + (dropped ? '（' + dropped + ' 個檔案無法複製，已略過）' : ''));
+        });
+    }
+
+    /* 從貼上事件的文字判斷是不是我們的節點資料 */
+    function parseClipPayload(text) {
+        if (!text || text.indexOf(MM_CLIP_TAG) < 0) return null;
+        try {
+            var o = JSON.parse(text);
+            return (o && o.tag === MM_CLIP_TAG && o.nodes && o.nodes.length) ? o : null;
+        } catch (e) { return null; }
+    }
+
     /* 貼上剪貼簿圖片（選取節點時 Ctrl+V） */
     function handlePaste(e) {
         var tag = (e.target && e.target.tagName ? e.target.tagName : '').toLowerCase();
         if (tag === 'input' || tag === 'textarea') return;   /* 輸入框內貼上照常，不搶圖片 */
         if (!state.selectedId || state.editingId ||
             state.editingRelId || state.editingBoundaryId) return;
-        var items = e.clipboardData && e.clipboardData.items;
+        var cd = e.clipboardData;
+        if (!cd) return;
+
+        /* 先看是不是我們自己複製的節點；是的話就貼節點，不要去碰圖片分支 */
+        var txt = '';
+        try { txt = cd.getData('text/plain') || ''; } catch (e2) { txt = ''; }
+        var payload = parseClipPayload(txt);
+        if (!payload && state.clipboard && !txt) payload = state.clipboard;   /* clipboard API 不可用時的備援 */
+        if (payload) {
+            e.preventDefault();
+            pasteNodesPayload(payload, state.selectedId);
+            return;
+        }
+
+        var items = cd.items;
         if (!items) return;
         for (var i = 0; i < items.length; i++) {
             if (items[i].type && items[i].type.indexOf('image/') === 0) {
@@ -5240,6 +5438,7 @@
         item('新增子主題', 'Tab', function () { var nid = addChild(id); if (nid) startEdit(nid, null, true); });
         if (id !== state.centralId) {
             item('新增同層主題', 'Enter', function () { var nid = addSibling(id); if (nid) startEdit(nid, null, true); });
+            item('在上方新增同層', 'Ctrl+Enter', function () { var nu = addSibling(id, null, true); if (nu) startEdit(nu, null, true); });
         }
         item('新增標註', '', function () { var cid = addCallout(id); if (cid) startEdit(cid, null, true); });
         item('建立關聯 →', '', function () { startLinking(id); });
@@ -5252,8 +5451,16 @@
             }
         }
         sep();
+        if (id !== state.centralId) {
+            item('複製主題', 'Ctrl+C', function () { copySelectionToClipboard(); });
+            item('剪下主題', 'Ctrl+X', function () { copySelectionToClipboard(true); });
+        }
+        if (state.clipboard) {
+            item('貼上主題', 'Ctrl+V', function () { pasteNodesPayload(state.clipboard, id); });
+        }
+        sep();
         item('超連結…', '', function () { openLinkModal(id); });
-        item('備註…', '', function () { openNoteModal(id); });
+        item('備註…', 'F4', function () { openNoteModal(id); });
         if (n.props && n.props.image) {
             item('更換圖片…', '', function () { pickFile(els.fileImageInput, function (f) { insertImage(id, f); }); });
             item('移除圖片', '', function () { removeImage(id); });
@@ -5915,6 +6122,14 @@
 
         if (isEditorTarget) {
             if (key === 'Escape') { e.preventDefault(); commitEdit(false); }
+            /* Ctrl+Enter：收下這次編輯，然後在「上方」插一個同層節點。
+               原本這裡只判斷 key === 'Enter'，沒排除 Ctrl，所以 Ctrl+Enter 會走成一般 Enter。 */
+            else if (key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                var curU = state.editingId;
+                commitEdit(true);
+                if (curU) { var upId = addSibling(curU, null, true); if (upId) startEdit(upId, null, true); }
+            }
             else if (key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitEdit(true); }
             else if (key === 'Tab') {
                 e.preventDefault();
@@ -5943,6 +6158,14 @@
             if (lk === 'y') { e.preventDefault(); redo(); return; }
             if (key === '/') { e.preventDefault(); if (state.selectedId) toggleCollapse(state.selectedId); return; }
             if (key === '0') { e.preventDefault(); fitView(); return; }
+            if (key === 'Enter') {
+                e.preventDefault();
+                if (state.selectedId) { var upN = addSibling(state.selectedId, null, true); if (upN) startEdit(upN, null, true); }
+                return;
+            }
+            if (lk === 'c') { e.preventDefault(); copySelectionToClipboard(); return; }
+            if (lk === 'x') { e.preventDefault(); copySelectionToClipboard(true); return; }
+            /* Ctrl+V 不在這裡處理：貼上要靠 paste 事件才讀得到剪貼簿內容 */
             return;
         }
 
@@ -5964,6 +6187,7 @@
         if (key === 'Tab') { e.preventDefault(); var a = addChild(sel); if (a) startEdit(a, null, true); return; }
         if (key === 'Enter') { e.preventDefault(); var b = addSibling(sel); if (b) startEdit(b, null, true); return; }
         if (key === 'F2' || key === ' ') { e.preventDefault(); startEdit(sel, null, true); return; }
+        if (key === 'F4') { e.preventDefault(); openNoteModal(sel); return; }
         if (key === 'Delete' || key === 'Backspace') {
             e.preventDefault();
             if (state.selectedIds.length > 1) removeNodes(state.selectedIds.slice());
@@ -6617,6 +6841,12 @@
         removeNodes: removeNodes,
         addBoundary: addBoundary,
         copyMapImage: copyMapImage,
+        addSibling: addSibling,
+        copySelectionToClipboard: copySelectionToClipboard,
+        pasteNodesPayload: pasteNodesPayload,
+        serializeNodesForClipboard: serializeNodesForClipboard,
+        parseClipPayload: parseClipPayload,
+        openNoteModal: openNoteModal,
         rebalanceSides: rebalanceSides,
         layoutMode: layoutMode,
         setLayoutMode: setLayoutMode,
