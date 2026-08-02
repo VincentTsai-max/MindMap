@@ -148,13 +148,26 @@
         box-shadow:inset 3px 0 0 var(--accent); padding-left:6px; border-radius:4px;
     }
     .drawer-sec{ cursor:pointer; }
+    .folder-kids.drop-target{
+        background:var(--accent-soft);
+        outline:2px dashed var(--accent); outline-offset:-2px; border-radius:8px;
+    }
     .folder-row.drop-target,
     .drawer-sec.drop-target{
         background:var(--accent-soft);
         outline:2px dashed var(--accent); outline-offset:-2px; border-radius:8px;
     }
-    .folder-row .tw{ width:14px; text-align:center; color:var(--ink-2); font-size:11px; }
-    .folder-row .cnt{ margin-left:auto; font-size:11.5px; color:var(--ink-2); font-weight:400; }
+    .folder-row .tw{ width:14px; text-align:center; color:var(--ink-2); font-size:11px; flex:none; }
+    .folder-row .nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .folder-row .cnt{ margin-left:auto; padding-left:8px; font-size:11px; color:var(--ink-2); font-weight:400; flex:none; }
+    /* 巢狀層級：靠引導線表達歸屬，而不是靠縮排數值。
+       之前用手算的 paddingLeft，直屬心智圖比子資料夾只深 4px，看起來像在子資料夾裡面。 */
+    .folder-kids{
+        margin-left:15px; padding-left:9px;
+        border-left:1px solid var(--line);
+    }
+    .folder-kids .map-item.nested{ margin-left:0; }
+    .drawer-sec.empty{ margin:2px 0 4px 4px; opacity:.7; }
     .drawer-sec{ margin:10px 6px 2px; font-size:11.5px; color:var(--ink-2); }
     .map-item.nested{ margin-left:18px; }
     .map-item{
@@ -869,7 +882,7 @@
         </div>
     </div>
 
-    <script src="mindmap.js?v=static10" charset="utf-8"></script>
+    <script src="mindmap.js?v=static11" charset="utf-8"></script>
     <div id="tbTip"></div>
 </body>
 </html>

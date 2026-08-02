@@ -4252,6 +4252,9 @@
             (kids[pk] || (kids[pk] = [])).push(folders[ki]);
         }
 
+        var mapFolderOf = {};
+        for (var mfi = 0; mfi < maps.length; mfi++) mapFolderOf[String(maps[mfi].mapId)] = maps[mfi].folderId || null;
+
         function folderDropHandlers(row, targetFolderId) {
             row.addEventListener('dragover', function (ev) {
                 ev.preventDefault();
@@ -4265,27 +4268,41 @@
                 row.classList.remove('drop-target');
                 var raw = ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '';
                 if (!raw) return;
-                if (raw.indexOf('folder:') === 0) moveFolderTo(raw.slice(7), targetFolderId);
-                else if (raw.indexOf('map:') === 0) moveMapToFolder(raw.slice(4), targetFolderId);
-                else moveMapToFolder(raw, targetFolderId);   /* 舊格式相容 */
+                if (raw.indexOf('folder:') === 0) { moveFolderTo(raw.slice(7), targetFolderId); return; }
+                var mid = (raw.indexOf('map:') === 0) ? raw.slice(4) : raw;   /* 舊格式相容 */
+                /* 已經在目標資料夾裡就直接說出來 —— 靜默無反應會讓人以為拖曳失敗 */
+                if (String(mapFolderOf[String(mid)] || '') === String(targetFolderId || '')) {
+                    toast('這張心智圖已經在' + (targetFolderId ? '這個資料夾' : '最外層') + '了');
+                    return;
+                }
+                moveMapToFolder(mid, targetFolderId);
             });
         }
 
-        function buildFolder(f, depth) {
+        /* ★ 改用巢狀 DOM 容器（.folder-kids）而不是手算 paddingLeft。
+           舊做法把子資料夾與直屬心智圖畫成 box 的兄弟節點，靠縮排值表達層級，
+           結果「TPDA 的直屬圖」縮排比「TPDA 的子資料夾」還深、又排在它後面，
+           看起來就像那張圖在子資料夾裡 —— 使用者會以為拖曳失敗。
+           包一層容器再用 border-left 畫引導線，層級關係就一目了然。 */
+        function buildFolder(f, depth, parentBox) {
             var inFolder = maps.filter(function (m) { return m.folderId === f.folderId; });
             var subs = kids[f.folderId] || [];
             var isOpen = !!openSet[f.folderId];
             var row = document.createElement('div');
             row.className = 'folder-row' + (state.activeFolderId === f.folderId ? ' active' : '');
-            row.style.paddingLeft = (10 + depth * 14) + 'px';
             var tw = document.createElement('span');
             tw.className = 'tw';
             tw.textContent = (inFolder.length || subs.length) ? (isOpen ? '▾' : '▸') : '·';
             var name = document.createElement('span');
+            name.className = 'nm';
             name.textContent = '📁 ' + f.title;
             var cnt = document.createElement('span');
             cnt.className = 'cnt';
-            cnt.textContent = inFolder.length ? String(inFolder.length) : '';
+            /* 直屬張數／子資料夾數分開標示，避免「1」讓人猜不出算的是什麼 */
+            var parts = [];
+            if (inFolder.length) parts.push(inFolder.length + ' 張');
+            if (subs.length) parts.push(subs.length + ' 夾');
+            cnt.textContent = parts.join('・');
             row.appendChild(tw); row.appendChild(name); row.appendChild(cnt);
 
             /* 點一下＝展開／摺疊，同時設為「作用中資料夾」（＋新增會放進這裡）；
@@ -4311,27 +4328,30 @@
                 }
             });
             folderDropHandlers(row, f.folderId);
-            box.appendChild(row);
+            parentBox.appendChild(row);
 
             if (isOpen) {
-                for (var si = 0; si < subs.length; si++) buildFolder(subs[si], depth + 1);
+                var kidsBox = document.createElement('div');
+                kidsBox.className = 'folder-kids';
+                folderDropHandlers(kidsBox, f.folderId);   /* 拖到資料夾的內容區也算放進這個資料夾 */
+                parentBox.appendChild(kidsBox);
+                /* 直屬心智圖排在子資料夾之前：它們是「這個資料夾的內容」，
+                   放在子資料夾後面會被誤讀成屬於最後那個子資料夾。 */
                 for (var mi = 0; mi < inFolder.length; mi++) {
-                    var it = buildMapItem(inFolder[mi], true);
-                    it.style.paddingLeft = (14 + (depth + 1) * 14) + 'px';
-                    box.appendChild(it);
+                    kidsBox.appendChild(buildMapItem(inFolder[mi], true));
                 }
+                for (var si = 0; si < subs.length; si++) buildFolder(subs[si], depth + 1, kidsBox);
                 if (!inFolder.length && !subs.length) {
                     var em = document.createElement('div');
-                    em.className = 'drawer-sec';
-                    em.style.marginLeft = (24 + depth * 14) + 'px';
+                    em.className = 'drawer-sec empty';
                     em.textContent = '（空資料夾）';
-                    box.appendChild(em);
+                    kidsBox.appendChild(em);
                 }
             }
         }
 
         var roots = kids[''] || [];
-        for (var ri = 0; ri < roots.length; ri++) buildFolder(roots[ri], 0);
+        for (var ri = 0; ri < roots.length; ri++) buildFolder(roots[ri], 0, box);
 
         /* 未分類 */
         var loose = maps.filter(function (m) { return m.folderId == null; });
